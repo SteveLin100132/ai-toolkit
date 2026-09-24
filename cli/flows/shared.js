@@ -1,6 +1,6 @@
-import { TARGETS, FEATURES, MISSING_CONFIG, loadConfig, outputRels, unsupportedReason, featureOption, scopeLabel, displayPath } from '../lib/config.js';
+import { TARGETS, FEATURES, ROOT, SOURCE_ROOT, MISSING_CONFIG, loadConfig, createConfig, outputRels, unsupportedReason, featureOption, scopeLabel, displayPath } from '../lib/config.js';
 import { validateAll } from '../lib/validate.js';
-import { log, title, blank, multiselect } from './steps.js';
+import { log, title, blank, multiselect, confirm } from './steps.js';
 
 // 印出驗證結果，回傳 { errors, warnings }
 export function* validateStep({ features } = {}) {
@@ -18,12 +18,25 @@ export function* validateStep({ features } = {}) {
 
 // 讓使用者選 targets 與 features，預設照 rulesync.jsonc。
 // global：要處理的層級。選到的工具都不支援的功能會停用並說明原因，而不是從清單拿掉
-export function* pickScope({ askTargets = true, askFeatures = true, preset = {}, global = false } = {}) {
-  const config = loadConfig();
-  if (!config.exists) {
-    yield log(MISSING_CONFIG, 'error');
-    return null;
+// 沒有 rulesync.jsonc 就用套件內附的範本建立（互動式會先確認；純文字模式帶 yes 直接建）。
+// 回傳 loadConfig() 的結果；使用者拒絕時回傳 null
+export function* ensureConfig({ yes = false } = {}) {
+  let config = loadConfig();
+  if (config.exists) return config;
+  yield log(MISSING_CONFIG, 'warning');
+  if (!yes) {
+    const ok = yield confirm(`要在 ${ROOT} 建立 rulesync.jsonc（Claude Code + Codex CLI，全部功能）與 .rulesync/ 嗎？`);
+    if (!ok) return null;
   }
+  const { file } = createConfig();
+  yield log(`已建立 ${displayPath(file)} 與 ${displayPath(SOURCE_ROOT)}/，之後可以直接編輯這個設定檔`, 'success');
+  config = loadConfig();
+  return config;
+}
+
+export function* pickScope({ askTargets = true, askFeatures = true, preset = {}, global = false, yes = false } = {}) {
+  const config = yield* ensureConfig({ yes });
+  if (!config) return null;
   let targets = preset.targets ?? config.targets;
   let features = preset.features ?? config.features;
   if (askTargets && !preset.targets) {

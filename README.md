@@ -18,7 +18,7 @@ npx ai-toolkit-cli validate           # 純文字模式
 npm i -g ai-toolkit-cli && ai-toolkit # 或全域安裝
 ```
 
-沒有 `rulesync.jsonc` 時，只有「登入遠端」「登出遠端」「從 Git 取得」「查閱文件」能用，其他功能會提示先建立設定（`npx rulesync init`）。
+沒有 `rulesync.jsonc` 時，需要設定的功能（產生、預覽、安裝到全域、清理、更新 .gitignore）會用套件內附的範本（`cli/templates/rulesync.jsonc`：Claude Code + Codex CLI，全部功能）在專案根目錄建立 `rulesync.jsonc` 與 `.rulesync/`：互動式會先確認，純文字模式直接建立。也可以用 `npx ai-toolkit-cli init` 先建好再編輯。
 
 **開發本 repo：**
 

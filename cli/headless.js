@@ -2,7 +2,7 @@ import chalk from 'chalk';
 import { color, level as levels } from './theme.js';
 import { drive } from './driver.js';
 import { byId } from './flows/index.js';
-import { loadConfig, MISSING_CONFIG } from './lib/config.js';
+import { loadConfig, createConfig, ROOT } from './lib/config.js';
 
 // 純文字模式：給 CI、npm scripts 與 AI 工具用。沒有互動，遇到要問的問題就用預設值或參數，
 // 需要確認的動作沒有 --yes 就中止。
@@ -11,6 +11,8 @@ const HELP = `用法：node cli/index.js [指令] [參數]
 不帶指令會進入互動式介面。
 
 指令：
+  init                           用範本建立 rulesync.jsonc 與 .rulesync/（已存在就不動）
+                                 其他需要設定檔的指令遇到沒有 rulesync.jsonc 時也會自動建立
   validate                       驗證 .rulesync/ 原始檔
   generate [--dry-run]           產生（或預覽）專案輸出
   install-global [--dry-run] [--yes]
@@ -68,7 +70,7 @@ const HEADLESS = {
   generate: (a) => byId.generate.start({ dryRun: a.dryRun, yes: true, reviewYes: a.yes, preset: a.preset }),
   'install-global': (a) => byId['install-global'].start({ mode: a.dryRun ? 'dry' : 'install', yes: a.yes, preset: a.preset }),
   doctor: () => byId.doctor.start(),
-  gitignore: () => byId.gitignore.start(),
+  gitignore: () => byId.gitignore.start({ yes: true }),
   clean: (a) => byId.clean.start({ yes: a.yes, preset: a.preset }),
   fetch: (a) => byId.fetch.start({
     yes: a.yes,
@@ -125,6 +127,11 @@ export async function runHeadless(args) {
     return 2;
   }
   if (command === 'repos') return listReposHeadless(args);
+  if (command === 'init') {
+    const { file, created } = createConfig();
+    process.stdout.write(created ? `已建立 ${file} 與 ${ROOT}/.rulesync/\n` : `${file} 已存在，未變更\n`);
+    return 0;
+  }
   if (command === 'docs' && !args._[1] && !args.search) {
     // 沒給識別碼：直接列出清單
     const { runCommand, rulesync } = await import('./lib/run.js');
@@ -137,12 +144,12 @@ export async function runHeadless(args) {
     printHelp();
     return 2;
   }
-  // 純文字模式不問問題：沒給參數就照 rulesync.jsonc。login／logout／fetch／docs 不需要設定檔
-  const config = loadConfig();
-  const needsConfig = !['login', 'logout', 'docs', 'fetch'].includes(command);
-  if (needsConfig && !config.exists) {
-    process.stderr.write(chalk.hex(color.danger)(`${MISSING_CONFIG}\n`));
-    return 2;
+  // 純文字模式不問問題：沒給參數就照 rulesync.jsonc。沒有設定檔時，需要它的指令先用範本建立，再讀一次
+  let config = loadConfig();
+  if (!config.exists && ['generate', 'install-global', 'clean', 'gitignore'].includes(command)) {
+    const { file } = createConfig();
+    process.stdout.write(chalk.hex(color.warning)(`! 找不到 rulesync.jsonc，已用範本建立 ${file} 與 .rulesync/\n`));
+    config = loadConfig();
   }
   const preset = { targets: args.targets ?? config.targets, features: args.features ?? config.features };
   const gen = HEADLESS[command]({ ...args, preset });

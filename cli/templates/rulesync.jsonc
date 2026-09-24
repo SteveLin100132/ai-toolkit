@@ -1,0 +1,18 @@
+{
+  "$schema": "https://github.com/dyoshikawa/rulesync/releases/latest/download/config-schema.json",
+
+  // 由 ai-toolkit 依 rulesync 17.0.0 的格式建立。
+  // 只產生 Claude Code 與 Codex CLI 的格式。
+  "targets": ["claudecode", "codexcli"],
+
+  // 管理 rules、skills、subagents、commands、hooks 與 mcp。原始檔放在 .rulesync/ 底下。
+  // 要加入其他功能前，先用「預覽產生」（generate --dry-run）確認會寫出哪些檔案。
+  // rules 會產生 CLAUDE.md／AGENTS.md（整份覆寫）；mcp 會產生 .mcp.json、.codex/config.toml。
+  "features": ["rules", "skills", "subagents", "commands", "hooks", "mcp"],
+
+  // 專案層級輸出：.claude/、.agents/、.codex/。全域安裝請用「安裝到全域」，不要改這個設定。
+  "global": false,
+
+  // 預設不刪除非 .rulesync/ 管理的輸出。要用 --delete 前，必須先 dry run（CLI 的「清理輸出」會自動先跑）。
+  "delete": false
+}

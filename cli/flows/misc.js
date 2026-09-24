@@ -1,7 +1,6 @@
-import { loadConfig, MISSING_CONFIG } from '../lib/config.js';
 import { rulesync } from '../lib/run.js';
 import { log, title, run, confirm } from './steps.js';
-import { pickScope, showOutputs } from './shared.js';
+import { pickScope, showOutputs, ensureConfig } from './shared.js';
 
 export const doctorMeta = { id: 'doctor', label: '診斷', hint: 'rulesync doctor，唯讀' };
 export function* doctorFlow() {
@@ -10,12 +9,9 @@ export function* doctorFlow() {
 }
 
 export const gitignoreMeta = { id: 'gitignore', label: '更新 .gitignore', hint: '依 rulesync.jsonc 的 targets 與 features 加入產生檔的忽略規則' };
-export function* gitignoreFlow() {
-  const config = loadConfig();
-  if (!config.exists) {
-    yield log(MISSING_CONFIG, 'error');
-    return false;
-  }
+export function* gitignoreFlow({ yes = false } = {}) {
+  const config = yield* ensureConfig({ yes });
+  if (!config) return false;
   yield log('只加入設定檔列出的工具與功能。不限定範圍的 rulesync gitignore 會連 CLAUDE.md、AGENTS.md 都忽略', 'muted');
   const { code } = yield run(rulesync(['gitignore', '--targets', config.targets.join(','), '--features', config.features.join(',')]));
   return code === 0;
@@ -23,7 +19,7 @@ export function* gitignoreFlow() {
 
 export const cleanMeta = { id: 'clean', label: '清理輸出', hint: '刪除專案輸出目錄中不是由 .rulesync/ 產生的檔案（--delete）' };
 export function* cleanFlow({ yes = false, preset = {} } = {}) {
-  const scope = yield* pickScope({ preset });
+  const scope = yield* pickScope({ preset, yes });
   if (!scope) return false;
   const { targets, features } = scope;
   yield* showOutputs(targets, features);

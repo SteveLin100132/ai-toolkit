@@ -30,7 +30,7 @@ export const meta = { id: 'generate', label: '產生', hint: '先驗證，再寫
 
 // reviewYes：純文字模式只有明確帶 --yes 才略過「尚未檢視的遠端項目」的確認（一般的 yes 在純文字模式一律是 true）
 export function* flow({ dryRun = false, preset = {}, yes = false, reviewYes = yes } = {}) {
-  const scope = yield* pickScope({ preset });
+  const scope = yield* pickScope({ preset, yes });
   if (!scope) return false;
   const { targets, features } = scope;
 

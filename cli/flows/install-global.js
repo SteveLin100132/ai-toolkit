@@ -19,7 +19,7 @@ export function* flow({ mode = null, yes = false, preset = {} } = {}) {
   }
   if (mode === 'restore') return yield* restoreFlow();
 
-  const scope = yield* pickScope({ preset, global: true });
+  const scope = yield* pickScope({ preset, global: true, yes });
   if (!scope) return false;
   const { targets, features } = scope;
 

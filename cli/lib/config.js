@@ -100,7 +100,19 @@ export const FETCHABLE_FEATURES = ['skills', 'subagents', 'commands'];
 export const KIND_FEATURE = { rule: 'rules', skill: 'skills', subagent: 'subagents', command: 'commands' };
 
 // 沒有 rulesync.jsonc 時不丟錯，回傳 exists: false，讓不需要設定的功能（登入、查文件）照常運作
-export const MISSING_CONFIG = `找不到 rulesync.jsonc（專案根目錄：${ROOT}）。請在有 rulesync.jsonc 的專案目錄執行，或先用 npx rulesync init 建立`;
+export const MISSING_CONFIG = `找不到 rulesync.jsonc（專案根目錄：${ROOT}）`;
+
+// 套件內附的 rulesync.jsonc 範本：targets 為 Claude Code 與 Codex CLI，features 全開
+export const TEMPLATE_CONFIG = path.join(PKG_ROOT, 'cli', 'templates', 'rulesync.jsonc');
+
+// 用範本在專案根目錄建立 rulesync.jsonc 與 .rulesync/。已存在就不覆蓋。回傳 { file, created }
+export function createConfig({ root = ROOT, template = TEMPLATE_CONFIG } = {}) {
+  const file = path.join(root, 'rulesync.jsonc');
+  if (fs.existsSync(file)) return { file, created: false };
+  fs.mkdirSync(path.join(root, '.rulesync'), { recursive: true });
+  fs.copyFileSync(template, file);
+  return { file, created: true };
+}
 export function loadConfig() {
   const file = CONFIG_FILE;
   if (!fs.existsSync(file)) return { raw: {}, targets: [], features: [], file, exists: false };

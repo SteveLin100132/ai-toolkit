@@ -23,7 +23,7 @@ export const menu = [
   { ...release.meta, start: () => release.flow() },
   { ...misc.doctorMeta, start: () => misc.doctorFlow() },
   { ...docs.meta, start: (o) => docs.flow(o) },
-  { ...misc.gitignoreMeta, start: () => misc.gitignoreFlow() },
+  { ...misc.gitignoreMeta, start: (o) => misc.gitignoreFlow(o) },
   { ...misc.cleanMeta, start: (o) => misc.cleanFlow(o) },
   { ...login.logoutMeta, start: (o) => login.logoutFlow(o) },
 ];
