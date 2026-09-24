@@ -152,22 +152,29 @@ export async function verifyAccess({ token, owner, repo, fetchImpl } = {}) {
   return repoSummary(r.json);
 }
 
+// feature 目錄的根：rulesync 專案是 <subPath>/.rulesync/；bare 是 <subPath>/ 本身
+// （rulesync fetch 的語意：直接在指定路徑底下找 skills/、subagents/…，不會自己進 .rulesync/）
+export function featureRoot(subPath, { bare = false } = {}) {
+  return [subPath, bare ? null : '.rulesync'].filter(Boolean).join('/').replace(/\/+/g, '/').replace(/^\.\//, '');
+}
+
 // 倉庫（或子目錄）底下有沒有 .rulesync/
 export async function hasRulesyncDir({ token, owner, repo, ref, subPath, fetchImpl } = {}) {
-  const dir = [subPath, '.rulesync'].filter(Boolean).join('/').replace(/\/+/g, '/');
+  const dir = featureRoot(subPath);
   const r = await ghApi(`/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/contents/${dir}`, { token, query: { ref }, fetchImpl });
   if (r.status === 200) return true;
   if (r.status === 404) return false;
   throw new GitHubError(explainStatus(r.status, `讀取 ${owner}/${repo} 的 ${dir}`, r), { status: r.status });
 }
 
-// 列出遠端 .rulesync/ 底下各類 feature 的項目。一次抓整棵樹（recursive），檢查 truncated。
-// 回傳 { skills, subagents, commands, hooks, rules, truncated }
-export async function listRemoteFeatures({ token, owner, repo, ref, subPath, fetchImpl } = {}) {
+// 列出遠端各類 feature 的項目：預設看 <subPath>/.rulesync/，bare 直接看 <subPath>/。
+// 一次抓整棵樹（recursive），檢查 truncated。回傳 { skills, subagents, commands, hooks, rules, truncated }
+export async function listRemoteFeatures({ token, owner, repo, ref, subPath, bare = false, fetchImpl } = {}) {
   const treeRef = ref || 'HEAD';
   const r = await ghApi(`/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/git/trees/${encodeURIComponent(treeRef)}`, { token, query: { recursive: 1 }, fetchImpl });
   if (r.status !== 200) throw new GitHubError(explainStatus(r.status, `讀取 ${owner}/${repo} 的檔案樹（${treeRef}）`, r), { status: r.status });
-  const prefix = [subPath, '.rulesync/'].filter(Boolean).join('/').replace(/\/+/g, '/').replace(/^\.\//, '');
+  const root = featureRoot(subPath, { bare });
+  const prefix = root ? `${root}/` : '';
   const result = { skills: [], subagents: [], commands: [], rules: [], hooks: false, mcp: false, truncated: Boolean(r.json.truncated) };
   for (const entry of r.json.tree ?? []) {
     if (entry.type !== 'blob' || !entry.path.startsWith(prefix)) continue;

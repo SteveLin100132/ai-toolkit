@@ -3,7 +3,7 @@ import { FEATURES, KIND_FEATURE, FETCHABLE_FEATURES, SOURCE_ROOT, displayPath } 
 import { rulesync } from '../lib/run.js';
 import { listAll } from '../lib/inventory.js';
 import { resolveTokens, getLogin, saveRemote, METHOD_LABELS, GitHubError, installUrl } from '../lib/github-auth.js';
-import { parseRemote, listOrgs, listRepos, verifyAccess, hasRulesyncDir, listRemoteFeatures, listSkillTags } from '../lib/remote.js';
+import { parseRemote, listOrgs, listRepos, verifyAccess, hasRulesyncDir, listRemoteFeatures, listSkillTags, featureRoot } from '../lib/remote.js';
 import { markReview, REVIEW_FEATURES } from '../lib/review.js';
 import { snapshotUnselected, restoreUnselected } from '../lib/prune.js';
 import { log, title, blank, select, multiselect, confirm, text, run, call } from './steps.js';
@@ -16,11 +16,16 @@ export const remoteMeta = { id: 'fetch:remote', label: '從遠端取得', hint: 
 
 const fetchable = () => Object.entries(FEATURES).filter(([value]) => FETCHABLE_FEATURES.includes(value));
 
-// 挑倉庫：上次使用 → 組織 → 倉庫清單（可過濾）→ 手動輸入。回傳 parseRemote 的結果
+// 挑倉庫：上次使用 → 組織 → 倉庫清單（可過濾）→ 手動輸入。回傳 { parsed, fromList }（取消回 null）。
+// fromList：從清單（或上次從清單）選的，視為 rulesync 專案，內容在 .rulesync/ 底下；
+// 手動輸入的照 rulesync fetch 原生語意，路徑底下直接找 skills/、subagents/…（例如 anthropics/skills）
 function* pickRepo({ token, method }) {
   const saved = getLogin();
   const first = [];
-  if (saved?.remote) first.push({ value: 'last', label: `上次使用：${saved.remote}` });
+  if (saved?.remote) first.push({ value: 'last', label: `上次使用：${saved.remote}`, hint: saved.remoteFromList ? '從清單選的（.rulesync/ 專案）' : '手動輸入的' });
+  const manual = function* () {
+    return { parsed: yield* askSource(), fromList: false };
+  };
   const how = yield select('要從哪個倉庫取得？', [
     ...first,
     {
@@ -28,10 +33,10 @@ function* pickRepo({ token, method }) {
       label: '從清單選',
       hint: method === 'device' ? '列出這個 GitHub App 已安裝的帳號、組織與倉庫' : `目前的 token 來自${METHOD_LABELS[method]}，清單只會列出 GitHub App 已安裝的範圍`,
     },
-    { value: 'manual', label: '手動輸入', hint: 'owner/repo、owner/repo@ref:path 或網址' },
+    { value: 'manual', label: '手動輸入', hint: 'owner/repo、owner/repo@ref:path 或網址；路徑照 rulesync 原生語意，不會自動進 .rulesync/' },
   ]);
-  if (how === 'last') return parseRemote(saved.remote);
-  if (how === 'manual') return yield* askSource();
+  if (how === 'last') return { parsed: parseRemote(saved.remote), fromList: Boolean(saved.remoteFromList) };
+  if (how === 'manual') return yield* manual();
 
   // GitHub App 的清單 = App 已安裝的帳號／組織
   const orgs = yield call(() => listOrgs({ token }), '讀取已安裝這個 App 的帳號');
@@ -41,7 +46,7 @@ function* pickRepo({ token, method }) {
   }
   if (orgs.value.length === 0) {
     yield log(`這個 GitHub App 還沒安裝在任何帳號或組織（安裝：${installUrl()}），改用手動輸入`, 'warning');
-    return yield* askSource();
+    return yield* manual();
   }
   const org = yield select('哪個帳號或組織？', orgs.value.map((o) => ({
     value: o.login, label: o.login, hint: `${o.isUser ? '個人帳號' : '組織'}，${o.description}`,
@@ -57,7 +62,7 @@ function* pickRepo({ token, method }) {
   if (repos.value.truncated) yield log('倉庫超過 500 個，只列出最近更新的 500 個；找不到請用手動輸入', 'warning');
   if (list.length === 0) {
     yield log(`${org} 底下沒有可存取的倉庫，改用手動輸入`, 'warning');
-    return yield* askSource();
+    return yield* manual();
   }
   if (list.length > 50) {
     const kw = yield text(`共 ${list.length} 個倉庫，輸入關鍵字過濾（留空＝全部）`, { initial: '' });
@@ -65,7 +70,7 @@ function* pickRepo({ token, method }) {
     if (k) list = list.filter((r) => r.fullName.toLowerCase().includes(k) || r.description.toLowerCase().includes(k));
     if (list.length === 0) {
       yield log('沒有符合的倉庫，改用手動輸入', 'warning');
-      return yield* askSource();
+      return yield* manual();
     }
   }
   const picked = yield select('哪個倉庫？', [
@@ -76,8 +81,8 @@ function* pickRepo({ token, method }) {
     })),
     { value: '__manual', label: '不在清單裡，手動輸入' },
   ]);
-  if (picked === '__manual') return yield* askSource();
-  return parseRemote(picked);
+  if (picked === '__manual') return yield* manual();
+  return { parsed: parseRemote(picked), fromList: true };
 }
 
 function* askSource(initial = '') {
@@ -118,11 +123,13 @@ export function* flow({ preset = {}, yes = false, remote = false } = {}) {
     yield title('從遠端取得');
   }
 
-  // 來源
+  // 來源。fromList：從清單選的 rulesync 專案，內容在 .rulesync/ 底下，抓的時候自動帶 --path .rulesync；
+  // 其他（手動輸入、「從 Git 取得」、純文字模式）照 rulesync 原生語意，路徑底下直接找 skills/ 等
   let parsed;
+  let fromList = false;
   try {
     if (preset.source) parsed = parseRemote(preset.source);
-    else if (remote) parsed = yield* pickRepo(auth);
+    else if (remote) ({ parsed, fromList } = (yield* pickRepo(auth)) ?? {});
     else parsed = yield* askSource();
   } catch (e) {
     yield log(e.message, 'error');
@@ -151,7 +158,7 @@ export function* flow({ preset = {}, yes = false, remote = false } = {}) {
     }
     info = r.value;
     yield log(`${parsed.fullName}（${info.private ? '私有' : '公開'}，預設分支 ${info.defaultBranch}）`, 'success');
-    if (remote) saveRemote(parsed.fullName);
+    if (remote) saveRemote(parsed.fullName, { fromList });
   } else {
     yield log('沒有找到 GitHub token；公開倉庫可以繼續，私有倉庫請先「登入遠端」', 'warning');
   }
@@ -161,7 +168,7 @@ export function* flow({ preset = {}, yes = false, remote = false } = {}) {
   let subPath = preset.path ?? parsed.path ?? '';
   let remoteList = null;
   if (remote && auth) {
-    // 清單模式：先看遠端有什麼，再決定要什麼
+    // 先看遠端有什麼，再決定要什麼。清單選的看 <subPath>/.rulesync/；手動輸入的直接看 <subPath>/
     if (!parsed.ref && preset.ref === undefined) {
       const which = yield select('要取得哪個版本？', [
         { value: '', label: `預設分支（${info?.defaultBranch ?? 'HEAD'}）` },
@@ -170,19 +177,27 @@ export function* flow({ preset = {}, yes = false, remote = false } = {}) {
       ref = which === '__input' ? (yield text('分支、tag 或 commit', { initial: '' })).trim() : '';
     }
     if (!parsed.path && preset.path === undefined) {
-      const has = yield call(() => hasRulesyncDir({ token: auth.token, owner: parsed.owner, repo: parsed.repo, ref: ref || undefined }), '檢查 .rulesync/');
-      if (has.ok && !has.value) {
-        yield log(`${parsed.fullName} 的根目錄沒有 .rulesync/`, 'warning');
-        const p = yield text('.rulesync/ 所在的子目錄（留空＝根目錄，會照 rulesync 預設位置找）', { initial: '' });
-        subPath = p.trim();
+      if (fromList) {
+        const has = yield call(() => hasRulesyncDir({ token: auth.token, owner: parsed.owner, repo: parsed.repo, ref: ref || undefined }), '檢查 .rulesync/');
+        if (has.ok && !has.value) {
+          yield log(`${parsed.fullName} 的根目錄沒有 .rulesync/`, 'warning');
+          const p = yield text('.rulesync/ 所在的子目錄（留空＝根目錄）', { initial: '' });
+          subPath = p.trim();
+        }
+      } else {
+        subPath = (yield text('倉庫內的子目錄（留空＝根目錄；底下要直接有 skills/、subagents/ 等）', { initial: '' })).trim();
       }
     }
-    const listed = yield call(() => listRemoteFeatures({ token: auth.token, owner: parsed.owner, repo: parsed.repo, ref: ref || undefined, subPath: subPath || undefined }), '列出遠端內容');
+    const listed = yield call(() => listRemoteFeatures({ token: auth.token, owner: parsed.owner, repo: parsed.repo, ref: ref || undefined, subPath: subPath || undefined, bare: !fromList }), '列出遠端內容');
     if (listed.ok) {
       remoteList = listed.value;
       if (remoteList.truncated) yield log('遠端檔案樹太大，清單可能不完整', 'warning');
       const found = fetchable().map(([f]) => `${FEATURES[f].label} ${remoteList[f]?.length ?? 0}`).join('、');
-      yield log(`遠端 .rulesync/ 內容：${found}${remoteList.hooks ? '、Hooks 1' : ''}${remoteList.rules.length ? `、Rules ${remoteList.rules.length}` : ''}`, 'info');
+      const where = featureRoot(subPath, { bare: !fromList }) || '根目錄';
+      yield log(`遠端 ${where}/ 內容：${found}${remoteList.hooks ? '、Hooks 1' : ''}${remoteList.rules.length ? `、Rules ${remoteList.rules.length}` : ''}`, 'info');
+      if (!fromList && fetchable().every(([f]) => (remoteList[f]?.length ?? 0) === 0)) {
+        yield log('這個路徑底下沒有 skills/、subagents/、commands/。若內容在 .rulesync/ 底下，請改用「從清單選」，或把子目錄填成 .rulesync', 'warning');
+      }
       if (remoteList.hooks || remoteList.rules.length || remoteList.mcp) {
         yield log('Hooks、Rules、MCP 會整份覆寫本機檔案，本 CLI 不提供取得；需要時請手動複製', 'muted');
       }
@@ -274,11 +289,13 @@ export function* flow({ preset = {}, yes = false, remote = false } = {}) {
     if (f === 'skills' && skills?.length) return skills.includes(i.name);
     return true;
   });
-  // 來源裡的 @ref 與 :path 已拆到 ref／subPath，用 --ref／--path 傳
+  // 來源裡的 @ref 與 :path 已拆到 ref／subPath，用 --ref／--path 傳。
+  // rulesync fetch 直接在 --path 底下找 skills/ 等，所以清單選的 rulesync 專案要把 .rulesync 補進路徑
   const source = parsed.fullName;
+  const fetchPath = fromList ? featureRoot(subPath.trim()) : subPath.trim();
   yield blank();
   yield title('摘要');
-  yield log(`來源：${source}${ref ? ` @${ref}` : ''}${subPath ? ` :${subPath}` : ''}`, 'info');
+  yield log(`來源：${source}${ref ? ` @${ref}` : ''}${fetchPath ? ` :${fetchPath}` : ''}`, 'info');
   yield log(`功能：${features.map((f) => FEATURES[f].label).join('、')}${skills?.length ? `，限定 skill：${skills.join('、')}` : ''}`, 'info');
   for (const p of picks) yield log(`限定 ${FEATURES[p.feature].label}：${p.selected.join('、')}（其餘 ${p.all.length - p.selected.length} 個取得後會還原或刪除）`, 'info');
   yield log(`寫入：${displayPath(SOURCE_ROOT)}/，同名時${conflict === 'overwrite' ? '覆蓋' : '略過'}${prune && conflict === 'overwrite' ? '，並清理 skill 目錄' : ''}`, 'info');
@@ -298,7 +315,7 @@ export function* flow({ preset = {}, yes = false, remote = false } = {}) {
 
   const args = ['fetch', source, '--features', features.join(',')];
   if (ref.trim()) args.push('--ref', ref.trim());
-  if (subPath.trim()) args.push('--path', subPath.trim());
+  if (fetchPath) args.push('--path', fetchPath);
   if (skills?.length) args.push('--skills', skills.join(','));
   args.push('--conflict', conflict);
   if (!prune) args.push('--no-prune');

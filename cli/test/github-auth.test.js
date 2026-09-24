@@ -24,12 +24,16 @@ test('hosts.json：建立時權限 0600、只刪該 host、remote 只由 saveRem
   assert.equal(fs.statSync(file).mode & 0o777, 0o600);
   assert.equal(getLogin(file).token, 'gho_secret');
   assert.equal(getLogin(file).remote, undefined);
-  saveRemote('acme/toolkit', file);
+  saveRemote('acme/toolkit', { fromList: true }, file);
   assert.equal(getLogin(file).remote, 'acme/toolkit');
-  // 重新登入保留 remote；gh 登入不存 token
+  assert.equal(getLogin(file).remoteFromList, true);
+  // 重新登入保留 remote 與來源方式；gh 登入不存 token
   saveLogin({ login: 'alice', method: 'gh', token: 'should-not-save' }, file);
   assert.equal(getLogin(file).token, undefined);
   assert.equal(getLogin(file).remote, 'acme/toolkit');
+  assert.equal(getLogin(file).remoteFromList, true);
+  saveRemote('anthropics/skills', {}, file);
+  assert.equal(getLogin(file).remoteFromList, false);
   // 其他 host 不受影響
   const hosts = readHosts(file);
   hosts['example.com'] = { login: 'x' };

@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { parseRemote, nextLink, listOrgs, listRepos, listRemoteFeatures, listSkillTags, verifyAccess } from '../lib/remote.js';
+import { parseRemote, nextLink, listOrgs, listRepos, listRemoteFeatures, listSkillTags, verifyAccess, featureRoot } from '../lib/remote.js';
 
 test('parseRemote 支援五種格式', () => {
   assert.deepEqual(parseRemote('acme/toolkit'), { owner: 'acme', repo: 'toolkit', ref: null, path: null, source: 'acme/toolkit', fullName: 'acme/toolkit' });
@@ -119,6 +119,28 @@ test('listRemoteFeatures：subPath 前綴', async () => {
   const r = await listRemoteFeatures({ token: 't', owner: 'acme', repo: 'toolkit', ref: 'dev', subPath: 'pkg', fetchImpl });
   assert.deepEqual(r.skills, ['x']);
   assert.match(calls[0], /recursive=1/);
+});
+
+test('listRemoteFeatures：bare 直接看路徑底下（rulesync fetch 原生語意），不進 .rulesync/', async () => {
+  const blob = (p) => ({ path: p, type: 'blob' });
+  const tree = [blob('skills/root-skill/SKILL.md'), blob('.rulesync/skills/hidden/SKILL.md'), blob('pkg/skills/nested/SKILL.md'), blob('pkg/subagents/bot.md')];
+  const { fetchImpl } = fake({ '/repos/acme/toolkit/git/trees/HEAD': { json: { tree } } });
+  const root = await listRemoteFeatures({ token: 't', owner: 'acme', repo: 'toolkit', bare: true, fetchImpl });
+  assert.deepEqual(root.skills, ['root-skill']);
+  const sub = await listRemoteFeatures({ token: 't', owner: 'acme', repo: 'toolkit', subPath: 'pkg', bare: true, fetchImpl });
+  assert.deepEqual(sub.skills, ['nested']);
+  assert.deepEqual(sub.subagents, ['bot']);
+  // 預設（rulesync 專案）只看 .rulesync/
+  const def = await listRemoteFeatures({ token: 't', owner: 'acme', repo: 'toolkit', fetchImpl });
+  assert.deepEqual(def.skills, ['hidden']);
+});
+
+test('featureRoot：清單選的補 .rulesync，bare 照原路徑', () => {
+  assert.equal(featureRoot(''), '.rulesync');
+  assert.equal(featureRoot('pkg'), 'pkg/.rulesync');
+  assert.equal(featureRoot('./pkg/'), 'pkg/.rulesync');
+  assert.equal(featureRoot('', { bare: true }), '');
+  assert.equal(featureRoot('pkg', { bare: true }), 'pkg');
 });
 
 test('listSkillTags：只留 <skill>/vX.Y.Z，新到舊', async () => {

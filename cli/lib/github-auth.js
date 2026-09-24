@@ -25,7 +25,7 @@ export const CONFIG_DIR = path.join(configHome(), 'ai-toolkit');
 export const HOSTS_FILE = path.join(CONFIG_DIR, 'hosts.json');
 
 // ---- hosts.json ----
-// { "github.com": { login, method: "device"|"gh"|"env", token?（只有 device 才存）, remote?（上次選的倉庫）, savedAt } }
+// { "github.com": { login, method: "device"|"gh"|"env", token?（只有 device 才存）, remote?（上次選的倉庫）, remoteFromList?, savedAt } }
 
 export function readHosts(file = HOSTS_FILE) {
   try {
@@ -55,18 +55,19 @@ export function saveLogin({ login, method, token }, file = HOSTS_FILE) {
     login,
     method,
     ...(method === 'device' && token ? { token } : {}),
-    ...(previous.remote ? { remote: previous.remote } : {}),
+    ...(previous.remote ? { remote: previous.remote, remoteFromList: Boolean(previous.remoteFromList) } : {}),
     savedAt: new Date().toISOString(),
   };
   writeHosts(hosts, file);
   return hosts[HOST];
 }
 
-// 記住上次在「從遠端取得」選的倉庫（owner/repo）
-export function saveRemote(remote, file = HOSTS_FILE) {
+// 記住上次在「從遠端取得」選的倉庫（owner/repo），以及是從清單選的還是手動輸入的
+// （清單選的視為 rulesync 專案，抓的時候會自動帶 --path .rulesync；手動輸入照 rulesync 原生語意）
+export function saveRemote(remote, { fromList = false } = {}, file = HOSTS_FILE) {
   const hosts = readHosts(file);
   if (!hosts[HOST]) return null;
-  hosts[HOST] = { ...hosts[HOST], remote };
+  hosts[HOST] = { ...hosts[HOST], remote, remoteFromList: Boolean(fromList) };
   writeHosts(hosts, file);
   return hosts[HOST];
 }

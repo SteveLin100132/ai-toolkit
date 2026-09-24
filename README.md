@@ -59,7 +59,7 @@ npm test
 | 選項 | 功能 | 會問什麼 |
 |---|---|---|
 | 9. 登入遠端 | 登入 GitHub 帳號（瀏覽器 Device Flow、借用本機 `gh`，或環境變數）；主選單的說明欄會顯示目前的登入狀態 | 登入方式；瀏覽器登入會顯示登入碼 |
-| 10. 從遠端取得 | 登入後從清單挑組織 → 倉庫 → 版本 → 項目，再 `rulesync fetch` 到 `.rulesync/` | 倉庫（上次使用／清單／手動）、版本、功能、skill（可選版本 tag）、同名處理、是否清理、確認 |
+| 10. 從遠端取得 | 登入後從清單挑組織 → 倉庫 → 版本 → 項目，再 `rulesync fetch` 到 `.rulesync/`。從清單選的倉庫視為 rulesync 專案（自動帶 `--path .rulesync`）；手動輸入的照 rulesync 原生語意 | 倉庫（上次使用／清單／手動）、版本、功能、skill（可選版本 tag）、同名處理、是否清理、確認 |
 | 11. 從 Git 取得 | 手動輸入 GitHub 倉庫，`rulesync fetch` 抓 skill／subagent／command 到 `.rulesync/`；有登入就自動帶 token | 來源、ref、子目錄、功能、限定 skill、同名處理、是否清理、確認 |
 | 12. 發布版本 | 為某個 skill 打 `<skill-name>/vX.Y.Z` tag | skill、版本、確認、是否推送 |
 
@@ -86,7 +86,8 @@ npm test
 - 私有倉庫要先「登入遠端」（見下一節）。token 依序找：`--token` → 登入遠端的瀏覽器登入（GitHub App）→ `GITHUB_TOKEN` → `GH_TOKEN` → 本機 `gh`；第一個讀不到倉庫時會自動換下一個再試。交給 rulesync 時用環境變數注入，不會出現在畫面上的指令裡。
 - 「從遠端取得」的倉庫清單只有 GitHub App 的 token（瀏覽器登入）能列；用環境變數或 `gh` 的 token 會得到說明，請改用瀏覽器登入或「手動輸入」。
 - 只支援 github.com：rulesync 17.0.0 的 `fetch` 只認得 github.com 與 gitlab.com，GitHub Enterprise Server 目前做不到。
-- 「從遠端取得」會先列出遠端 `.rulesync/` 有哪些 skill、subagent、command，三類都可以逐項勾選（預設全選，`a` 全選／全不選）。skill 由 rulesync 的 `--skills` 限定；subagent 與 command 因為 rulesync 沒有限定參數，會整批抓下來後由 CLI 把沒勾選的還原（本機原本有）或刪除（本機原本沒有）。只選一個 skill 時可以挑 `<skill>/vX.Y.Z` 的版本 tag。遠端的 hooks、rules、MCP 不提供取得，因為會整份覆寫本機檔案。
+- rulesync 的 `fetch` 是在指定路徑底下**直接**找 `skills/`、`subagents/`、`commands/`，不會自己進 `.rulesync/`。所以「從遠端取得」分兩種：**從清單選**（含「上次使用」是清單選的）視為 rulesync 專案，內容在 `.rulesync/` 底下，CLI 會自動帶 `--path .rulesync`（有填子目錄則是 `<子目錄>/.rulesync`）；**手動輸入**與「從 Git 取得」照 rulesync 原生語意，路徑就是您給的路徑，適合抓 `anthropics/skills` 這類根目錄直接放 `skills/` 的倉庫，或既有的 Claude Code／Codex skill 倉庫。手動輸入若要抓 rulesync 專案，子目錄填 `.rulesync`。
+- 「從遠端取得」會先列出遠端（清單選：`.rulesync/`；手動輸入：您給的路徑）有哪些 skill、subagent、command，三類都可以逐項勾選（預設全選，`a` 全選／全不選）。skill 由 rulesync 的 `--skills` 限定；subagent 與 command 因為 rulesync 沒有限定參數，會整批抓下來後由 CLI 把沒勾選的還原（本機原本有）或刪除（本機原本沒有）。只選一個 skill 時可以挑 `<skill>/vX.Y.Z` 的版本 tag。遠端的 hooks、rules、MCP 不提供取得，因為會整份覆寫本機檔案。
 - 取得完會問「要現在產生嗎？」：同意就接著選工具（Claude Code／Codex CLI）並產生這次取得的功能，不用回主選單。純文字模式用 `--generate`（工具照 `-t` 或 `rulesync.jsonc`）。
 - 取得的 subagent 與 command 一產生就會在您的機器上生效，所以 CLI 會寫下 `.rulesync/.needs-review.json`（已列入 `.gitignore`）：下次「產生」會先列出這些項目、跑 dry run、要求確認後才寫入。純文字模式要帶 `--yes` 才會略過這個確認。
 - 取得的檔案直接進 `.rulesync/`，之後跟自己寫的 skill 一樣用「驗證」「預覽產生」處理。
