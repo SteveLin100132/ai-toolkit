@@ -1,6 +1,6 @@
 {
   "name": "ai-toolkit-cli",
-  "version": "0.4.3",
+  "version": "0.4.4",
   "license": "MIT",
   "type": "module",
   "description": "互動式 CLI：用 rulesync 管理團隊的 AI skill／subagent／command，從 GitHub 私有倉庫取得並產生 Claude Code 與 Codex CLI 格式",
@@ -33,6 +33,7 @@
     "install-global": "node cli/index.js install-global",
     "install-global:dry": "node cli/index.js install-global --dry-run",
     "clean": "node cli/index.js clean",
+    "remove": "node cli/index.js remove",
     "login": "node cli/index.js login",
     "logout": "node cli/index.js logout",
     "repos": "node cli/index.js repos",

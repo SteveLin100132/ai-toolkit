@@ -19,7 +19,8 @@ const HELP = `用法：node cli/index.js [指令] [參數]
                                  安裝到 ~/.claude、~/.agents、~/.codex（會備份）
   doctor                         rulesync doctor
   gitignore                      更新 .gitignore
-  clean [--yes]                  generate --delete（先 dry run）
+  clean [--yes]                  generate --delete：刪掉輸出目錄裡多出來的檔案後重新產生（先 dry run）
+  remove [--yes]                 移除由 .rulesync/ 產生的專案輸出，不重新產生（先列清單）
   fetch <來源> [--features a,b] [--ref r] [--path p] [--skills a,b]
         [--conflict overwrite|skip] [--no-prune] [--token t] [--generate] [--yes]
                                  從 GitHub 倉庫取得 skill／subagent／command 到 .rulesync/
@@ -74,6 +75,7 @@ const HEADLESS = {
   doctor: () => byId.doctor.start(),
   gitignore: () => byId.gitignore.start({ yes: true }),
   clean: (a) => byId.clean.start({ yes: a.yes, preset: a.preset }),
+  remove: (a) => byId.remove.start({ yes: a.yes, preset: a.preset }),
   fetch: (a) => byId.fetch.start({
     yes: a.yes,
     preset: {
@@ -150,7 +152,7 @@ export async function runHeadless(args) {
   }
   // 純文字模式不問問題：沒給參數就照 rulesync.jsonc。沒有設定檔時，需要它的指令先用範本建立，再讀一次
   let config = loadConfig();
-  if (!config.exists && ['generate', 'install-global', 'clean', 'gitignore'].includes(command)) {
+  if (!config.exists && ['generate', 'install-global', 'clean', 'remove', 'gitignore'].includes(command)) {
     const { file } = createConfig();
     process.stdout.write(chalk.hex(color.warning)(`! 找不到 rulesync.jsonc，已用範本建立 ${file} 與 .rulesync/\n`));
     config = loadConfig();
