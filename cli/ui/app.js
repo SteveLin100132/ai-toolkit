@@ -4,12 +4,13 @@ import { html } from './html.js';
 import { Header, HEADER_HEIGHT, Footer, Log, Busy, Select, MultiSelect, Confirm, TextPrompt, Pager, DeviceCodePrompt } from './components.js';
 import { color, brand } from '../theme.js';
 import { drive } from '../driver.js';
-import { menu } from '../flows/index.js';
-import { loadConfig, readPackageVersion, MISSING_CONFIG, ROOT } from '../lib/config.js';
+import { menu, groups } from '../flows/index.js';
+import { loadConfig, readPackageVersion, MISSING_CONFIG, ROOT, displayPath } from '../lib/config.js';
+import { getLogin, METHOD_LABELS } from '../lib/github-auth.js';
 import { listRules, listSkills, listSubagents, listCommands, readHooks, readMcp } from '../lib/inventory.js';
 import { Cancelled } from '../flows/steps.js';
 
-const versionInfo = `v${readPackageVersion()} · rulesync ${readPackageVersion('rulesync')} · node ${process.versions.node} · ${ROOT}`;
+const versionInfo = `v${readPackageVersion()} · rulesync ${readPackageVersion('rulesync')} · node ${process.versions.node} · ${displayPath(ROOT)}`;
 
 export function App() {
   const { exit } = useApp();
@@ -117,14 +118,22 @@ function MenuScreen({ onPick, onQuit }) {
   const [summary] = useState(() => {
     try {
       const config = loadConfig();
-      if (!config.exists) return `${MISSING_CONFIG}。目前只能使用登入、查文件等不需要設定的功能`;
+      if (!config.exists) return `${MISSING_CONFIG}，執行「產生」等功能時會用範本建立`;
       return `${listRules().length} 個 rule · ${listSkills().length} 個 skill · ${listSubagents().length} 個 subagent · ${listCommands().length} 個 command · ${readHooks().count} 個 hook · ${readMcp().count} 個 MCP · targets：${config.targets.join('、')} · features：${config.features.join('、')}`;
     } catch (err) {
       return `讀取 rulesync.jsonc 失敗：${err.message}`;
     }
   });
+  // 「登入遠端」的說明即時顯示登入狀態
+  const [loginHint] = useState(() => {
+    const saved = getLogin();
+    return saved ? `已以 ${saved.login} 登入（${METHOD_LABELS[saved.method] ?? saved.method}）` : '未登入';
+  });
   const options = [
-    ...menu.map((m) => ({ value: m.id, label: m.label, hint: m.hint })),
+    ...groups.flatMap((g) => [
+      { heading: true, label: g.title },
+      ...g.items.map((m) => ({ value: m.id, label: m.label, hint: m.id === 'login' ? loginHint : m.hint })),
+    ]),
     { value: '__quit', label: '離開' },
   ];
   return html`<${Box} flexDirection="column">

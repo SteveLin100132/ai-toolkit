@@ -34,24 +34,41 @@ npm test
 
 ## 互動式介面
 
-`npm start` 會開啟 TUI（深色終端機配色）。主選單：
+`npm start` 會開啟 TUI（深色終端機配色）。主選單分四群，數字鍵編號連續：
+
+**原始檔（.rulesync/）**
 
 | 選項 | 功能 | 會問什麼 |
 |---|---|---|
 | 1. 驗證 | 檢查所有 rule、skill、subagent、command 的 frontmatter、名稱、不必要的檔案，root rule 是否只有一個，以及 `hooks.jsonc`、`mcp.json` 能否解析 | 不問 |
-| 2. 預覽產生（dry run） | 列出會寫出哪些檔案，不寫入 | 工具、功能 |
-| 3. 產生 | 先驗證，再寫入專案的 `.claude/`、`.agents/`、`.codex/` | 工具、功能、確認 |
-| 4. 匯入 | 把 Claude Code 或 Codex 既有的 rules、skills、subagents、commands、hooks、MCP 轉成 rulesync 格式，先暫存再合併 | 來源工具、功能、專案或全域、來源目錄、確認 |
-| 5. 登入遠端 | 登入 GitHub 帳號（瀏覽器 Device Flow、借用本機 `gh`，或環境變數），之後「從遠端取得」不用再設 token | 登入方式；瀏覽器登入會顯示登入碼 |
-| 6. 從遠端取得 | 登入後從清單挑組織 → 倉庫 → 版本 → 項目，再 `rulesync fetch` 到 `.rulesync/` | 倉庫（上次使用／清單／手動）、版本、功能、skill（可選版本 tag）、同名處理、是否清理、確認 |
-| 7. 從 Git 取得 | 手動輸入 GitHub 倉庫，`rulesync fetch` 抓 skill／subagent／command 到 `.rulesync/`；有登入就自動帶 token | 來源、ref、子目錄、功能、限定 skill、同名處理、是否清理、確認 |
-| 8. 安裝到全域 | 寫入 `~/.claude`、`~/.claude.json`、`~/.agents`、`~/.codex`；也可以還原備份 | 安裝／dry run／還原、工具、功能、確認 |
-| 9. 新增 | 建立 rule、skill、subagent、command 骨架，或在 `hooks.jsonc` 加一筆 hook、在 `mcp.json` 加一個 MCP 伺服器 | 種類；rule／skill／subagent／command：名稱、描述（rule 另問是否為 root）；hook：事件、matcher、指令；MCP：名稱、連線方式、指令或網址；確認 |
-| 10. 發布版本 | 為某個 skill 打 `<skill-name>/vX.Y.Z` tag | skill、版本、確認、是否推送 |
-| 11. 診斷 | `rulesync doctor`，唯讀 | 不問 |
-| 12. 查閱 rulesync 文件 | 讀取內建於 rulesync 的官方文件（可捲動），或全文搜尋 | 瀏覽／搜尋、文件或關鍵字 |
-| 13. 更新 .gitignore | 依 `rulesync.jsonc` 的 targets 與 features 加入忽略規則 | 不問 |
-| 14. 清理輸出 | `generate --delete`，刪除專案輸出目錄中不是由 `.rulesync/` 產生的檔案 | 工具、功能、輸入 `yes` |
+| 2. 新增 | 建立 rule、skill、subagent、command 骨架，或在 `hooks.jsonc` 加一筆 hook、在 `mcp.json` 加一個 MCP 伺服器 | 種類；rule／skill／subagent／command：名稱、描述（rule 另問是否為 root）；hook：事件、matcher、指令；MCP：名稱、連線方式、指令或網址；確認 |
+| 3. 匯入 | 把 Claude Code 或 Codex 既有的 rules、skills、subagents、commands、hooks、MCP 轉成 rulesync 格式，先暫存再合併 | 來源工具、功能、專案或全域、來源目錄、確認 |
+
+**產生輸出**
+
+| 選項 | 功能 | 會問什麼 |
+|---|---|---|
+| 4. 預覽產生（dry run） | 列出會寫出哪些檔案，不寫入 | 工具、功能 |
+| 5. 產生 | 先驗證，再寫入專案的 `.claude/`、`.agents/`、`.codex/` | 工具、功能、確認 |
+| 6. 安裝到全域 | 寫入 `~/.claude`、`~/.claude.json`、`~/.agents`、`~/.codex`；也可以還原備份 | 安裝／dry run／還原、工具、功能、確認 |
+| 7. 清理輸出 | `generate --delete`，刪除專案輸出目錄中不是由 `.rulesync/` 產生的檔案 | 工具、功能、輸入 `yes` |
+| 8. 更新 .gitignore | 依 `rulesync.jsonc` 的 targets 與 features 加入忽略規則 | 不問 |
+
+**遠端倉庫**
+
+| 選項 | 功能 | 會問什麼 |
+|---|---|---|
+| 9. 登入遠端 | 登入 GitHub 帳號（瀏覽器 Device Flow、借用本機 `gh`，或環境變數）；主選單的說明欄會顯示目前的登入狀態 | 登入方式；瀏覽器登入會顯示登入碼 |
+| 10. 從遠端取得 | 登入後從清單挑組織 → 倉庫 → 版本 → 項目，再 `rulesync fetch` 到 `.rulesync/` | 倉庫（上次使用／清單／手動）、版本、功能、skill（可選版本 tag）、同名處理、是否清理、確認 |
+| 11. 從 Git 取得 | 手動輸入 GitHub 倉庫，`rulesync fetch` 抓 skill／subagent／command 到 `.rulesync/`；有登入就自動帶 token | 來源、ref、子目錄、功能、限定 skill、同名處理、是否清理、確認 |
+| 12. 發布版本 | 為某個 skill 打 `<skill-name>/vX.Y.Z` tag | skill、版本、確認、是否推送 |
+
+**其他**
+
+| 選項 | 功能 | 會問什麼 |
+|---|---|---|
+| 13. 診斷 | `rulesync doctor`，唯讀 | 不問 |
+| 14. 查閱 rulesync 文件 | 讀取內建於 rulesync 的官方文件（可捲動），或全文搜尋 | 瀏覽／搜尋、文件或關鍵字 |
 | 15. 登出遠端 | 刪除本機儲存的 GitHub 登入（不撤銷 GitHub 端授權） | 確認 |
 
 選功能時，所選工具在這個層級都不支援的功能會標成 `[-]` 停用並寫出原因，不會從清單拿掉；只有部分工具支援時，說明欄會寫出哪些工具會處理。目前唯一的例子是 **Codex CLI 的 Commands 只支援全域**：專案層級的「產生」不會寫出 Codex 的 command，產生完會再提醒一次，要用「安裝到全域」才會寫到 `~/.codex/prompts/`。

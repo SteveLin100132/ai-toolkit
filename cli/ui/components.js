@@ -126,14 +126,21 @@ export function DeviceCodePrompt({ userCode, verificationUri, expiresIn, poll, o
   <//>`;
 }
 
-// 單選：↑↓ 移動、Enter 確認、數字鍵直接跳、Esc 取消
+// 單選：↑↓ 移動、Enter 確認、數字鍵直接跳、Esc 取消。
+// { heading: true, label } 的項目是群組標題：不能選、不編號，游標會跳過
 export function Select({ question, options, onSubmit, onCancel, showNumbers = false }) {
-  const [index, setIndex] = useState(0);
+  // 可選項目在 options 裡的位置；編號與上下移動都只看這些
+  const selectable = options.map((o, i) => (o.heading ? -1 : i)).filter((i) => i >= 0);
+  const [index, setIndex] = useState(selectable[0] ?? 0);
+  const move = (delta) => setIndex((i) => {
+    const at = selectable.indexOf(i);
+    return selectable[(at + delta + selectable.length) % selectable.length];
+  });
   // 數字鍵：一秒內連按兩個數字可以選 10 以上的項目（例如 1、0 → 10）
   const digits = useRef({ text: '', at: 0 });
   useInput((input, key) => {
-    if (key.upArrow) setIndex((i) => (i - 1 + options.length) % options.length);
-    else if (key.downArrow) setIndex((i) => (i + 1) % options.length);
+    if (key.upArrow) move(-1);
+    else if (key.downArrow) move(1);
     else if (key.return) {
       if (!options[index].disabled) onSubmit(options[index].value);
     } else if (key.escape) onCancel?.();
@@ -141,22 +148,28 @@ export function Select({ question, options, onSubmit, onCancel, showNumbers = fa
       const now = Date.now();
       const combined = now - digits.current.at < 1000 ? digits.current.text + input : input;
       const n = Number(combined);
-      if (n >= 1 && n <= options.length) {
-        setIndex(n - 1);
+      if (n >= 1 && n <= selectable.length) {
+        setIndex(selectable[n - 1]);
         digits.current = { text: combined, at: now };
-      } else if (Number(input) >= 1 && Number(input) <= options.length) {
-        setIndex(Number(input) - 1);
+      } else if (Number(input) >= 1 && Number(input) <= selectable.length) {
+        setIndex(selectable[Number(input) - 1]);
         digits.current = { text: input, at: now };
       }
     } else if (input === 'q' && onCancel) onCancel();
   });
   // 說明文字對齊到同一欄
-  const labelWidth = options.some((o) => o.hint || o.disabled) ? Math.max(...options.map((o) => stringWidth(o.label))) + 2 : 0;
+  const items = options.filter((o) => !o.heading);
+  const labelWidth = items.some((o) => o.hint || o.disabled) ? Math.max(...items.map((o) => stringWidth(o.label))) + 2 : 0;
   return html`<${Box} flexDirection="column">
     ${question ? html`<${Text} color=${color.azure} bold>${question}<//>` : null}
     ${options.map((o, i) => {
+      if (o.heading) {
+        return html`<${Box} key=${`h-${i}`} marginTop=${i === 0 ? 0 : 1}>
+          <${Text} color=${color.azure}>  ── ${o.label} ${'─'.repeat(Math.max(4, 44 - stringWidth(o.label)))}<//>
+        <//>`;
+      }
       const active = i === index;
-      const num = showNumbers ? `${String(i + 1).padStart(2)}. ` : '';
+      const num = showNumbers ? `${String(selectable.indexOf(i) + 1).padStart(2)}. ` : '';
       return html`<${Box} key=${o.value}>
         <${Text} color=${o.disabled ? color.muted : active ? color.gold : color.body} bold=${active}>${active ? '▸ ' : '  '}${num}${padDisplay(o.label, labelWidth)}<//>
         <${OptionHint} option=${o} />
