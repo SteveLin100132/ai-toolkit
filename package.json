@@ -1,0 +1,45 @@
+{
+  "name": "ai-toolkit-cli",
+  "version": "0.1.0",
+  "license": "MIT",
+  "type": "module",
+  "description": "互動式 CLI：用 rulesync 管理團隊的 AI skill／subagent／command，從 GitHub 私有倉庫取得並產生 Claude Code 與 Codex CLI 格式",
+  "keywords": ["rulesync", "claude-code", "codex", "skills", "cli"],
+  "engines": {
+    "node": ">=22"
+  },
+  "bin": {
+    "ai-toolkit": "cli/index.js"
+  },
+  "files": [
+    "cli",
+    "!cli/test",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "start": "node cli/index.js",
+    "validate": "node cli/index.js validate",
+    "generate": "node cli/index.js generate",
+    "generate:dry": "node cli/index.js generate --dry-run",
+    "doctor": "node cli/index.js doctor",
+    "gitignore": "node cli/index.js gitignore",
+    "install-global": "node cli/index.js install-global",
+    "install-global:dry": "node cli/index.js install-global --dry-run",
+    "clean": "node cli/index.js clean",
+    "login": "node cli/index.js login",
+    "logout": "node cli/index.js logout",
+    "repos": "node cli/index.js repos",
+    "test": "node --test 'cli/test/*.test.js'",
+    "rulesync": "rulesync"
+  },
+  "dependencies": {
+    "chalk": "6.0.0",
+    "htm": "3.1.1",
+    "ink": "7.1.1",
+    "ink-spinner": "5.0.0",
+    "react": "19.3.0",
+    "rulesync": "17.0.0",
+    "string-width": "8.2.2"
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "$schema": "https://github.com/dyoshikawa/rulesync/releases/latest/download/config-schema.json",
+
+  // 依據 rulesync 17.0.0 撰寫。
+  // 只產生 Claude Code 與 Codex CLI 的格式。
+  "targets": ["claudecode", "codexcli"],
+
+  // 目前管理 rules、skills、subagents、commands、hooks 與 mcp。要加入其他功能前，
+  // 先用 npm run generate:dry 確認會寫出哪些檔案。
+  // rules 會產生 CLAUDE.md／AGENTS.md（整份覆寫）；mcp 會產生 .mcp.json、.codex/config.toml。
+  "features": ["rules", "skills", "subagents", "commands", "hooks", "mcp"],
+
+  // 專案層級輸出：.claude/skills/ 與 .agents/skills/（兩者都已列入 gitignore）。
+  // 全域安裝請用 npm run install-global，不要改這個設定。
+  "global": false,
+
+  // 預設不刪除非本 repo 管理的輸出。要用 --delete 前，必須先 dry run。
+  "delete": false
+}
