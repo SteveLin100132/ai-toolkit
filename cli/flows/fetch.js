@@ -5,9 +5,11 @@ import { listAll } from '../lib/inventory.js';
 import { resolveTokens, getLogin, saveRemote, METHOD_LABELS, GitHubError, installUrl } from '../lib/github-auth.js';
 import { parseRemote, listOrgs, listRepos, verifyAccess, hasRulesyncDir, listRemoteFeatures, listSkillTags } from '../lib/remote.js';
 import { markReview, REVIEW_FEATURES } from '../lib/review.js';
+import { snapshotUnselected, restoreUnselected } from '../lib/prune.js';
 import { log, title, blank, select, multiselect, confirm, text, run, call } from './steps.js';
 import { validateStep } from './shared.js';
 import { flow as loginFlow } from './login.js';
+import { flow as generateFlow } from './generate.js';
 
 export const meta = { id: 'fetch', label: '從 Git 取得', hint: '輸入 GitHub 倉庫，抓 skill／subagent／command 到 .rulesync/（rulesync fetch）' };
 export const remoteMeta = { id: 'fetch:remote', label: '從遠端取得', hint: '登入後從清單挑倉庫與項目，再抓到 .rulesync/' };
@@ -193,7 +195,7 @@ export function* flow({ preset = {}, yes = false, remote = false } = {}) {
   }
 
   // 功能
-  const features = preset.features ?? (yield multiselect(
+  let features = preset.features ?? (yield multiselect(
     '要取得哪些功能？',
     fetchable().map(([value, f]) => {
       const n = remoteList ? remoteList[value]?.length ?? 0 : null;
@@ -232,9 +234,22 @@ export function* flow({ preset = {}, yes = false, remote = false } = {}) {
       skills = s.trim() ? s.split(',').map((x) => x.trim()).filter(Boolean) : [];
     }
   }
+  // subagent／command 逐項挑選：rulesync 會整批抓，沒勾選的在 fetch 後還原或刪除（見 lib/prune.js）
+  const picks = [];
   if (remoteList) {
     for (const f of ['subagents', 'commands']) {
-      if (features.includes(f) && remoteList[f].length) yield log(`${FEATURES[f].label} 會整批取得（rulesync 沒有限定參數）：${remoteList[f].join('、')}`, 'info');
+      if (!features.includes(f) || remoteList[f].length === 0) continue;
+      const chosen = yield multiselect(`要取得哪些 ${FEATURES[f].label}？`, remoteList[f].map((n) => ({ value: n, label: n, selected: true })));
+      if (chosen.length === 0) {
+        yield log(`${FEATURES[f].label} 一個都沒選，略過這個功能`, 'muted');
+        features = features.filter((x) => x !== f);
+      } else if (chosen.length < remoteList[f].length) {
+        picks.push({ feature: f, all: remoteList[f], selected: chosen });
+      }
+    }
+    if (features.length === 0) {
+      yield log('沒有要取得的項目', 'error');
+      return false;
     }
   }
 
@@ -265,6 +280,7 @@ export function* flow({ preset = {}, yes = false, remote = false } = {}) {
   yield title('摘要');
   yield log(`來源：${source}${ref ? ` @${ref}` : ''}${subPath ? ` :${subPath}` : ''}`, 'info');
   yield log(`功能：${features.map((f) => FEATURES[f].label).join('、')}${skills?.length ? `，限定 skill：${skills.join('、')}` : ''}`, 'info');
+  for (const p of picks) yield log(`限定 ${FEATURES[p.feature].label}：${p.selected.join('、')}（其餘 ${p.all.length - p.selected.length} 個取得後會還原或刪除）`, 'info');
   yield log(`寫入：${displayPath(SOURCE_ROOT)}/，同名時${conflict === 'overwrite' ? '覆蓋' : '略過'}${prune && conflict === 'overwrite' ? '，並清理 skill 目錄' : ''}`, 'info');
   if (affected.length && conflict === 'overwrite') {
     yield log(`本機已有這些項目，若遠端同名會被覆蓋：${affected.map((i) => i.name).join('、')}`, 'warning');
@@ -288,11 +304,19 @@ export function* flow({ preset = {}, yes = false, remote = false } = {}) {
   if (!prune) args.push('--no-prune');
 
   const before = new Map(existing.map((i) => [i.file, mtime(i.file)]));
+  // 沒勾選的 subagent／command：先留住本機原本的內容，fetch 後還原或刪除
+  const snapshots = picks.map((p) => snapshotUnselected(p.feature, p.all, p.selected));
   const { code } = yield run(rulesync(args, { env: auth ? { GITHUB_TOKEN: auth.token } : {} }));
   if (code !== 0) {
     yield log(`rulesync 結束代碼 ${code}`, 'error');
     if (!auth) yield log('若這是私有倉庫，請先「登入遠端」', 'muted');
+    for (const s of snapshots) restoreUnselected(s);
     return false;
+  }
+  for (const s of snapshots) {
+    const { restored, removed } = restoreUnselected(s);
+    if (removed.length) yield log(`已移除沒勾選的 ${FEATURES[s.feature].label}：${removed.join('、')}`, 'muted');
+    if (restored.length) yield log(`已還原本機原有的 ${FEATURES[s.feature].label}：${restored.join('、')}`, 'muted');
   }
 
   yield blank();
@@ -313,10 +337,22 @@ export function* flow({ preset = {}, yes = false, remote = false } = {}) {
     yield log(`已標記 ${review.items.length} 個項目需要檢視（${displayPath(SOURCE_ROOT)}/.needs-review.json）。下次「產生」會先 dry run 並要求確認`, 'warning');
   }
   yield blank();
-  yield* validateStep({ features });
+  const validation = yield* validateStep({ features });
   yield blank();
-  yield log('接下來：檢視取得的內容、補 CHANGELOG.md，然後執行「預覽產生」', 'muted');
-  return true;
+
+  // 取得後直接產生：只問這次取得的功能；工具（Claude Code／Codex CLI）在產生流程裡選。
+  // 有需要檢視的項目時，產生流程會先 dry run 並要求確認
+  const wantGenerate = preset.generate ?? (yes ? false : yield confirm('要現在產生嗎？（會問要轉成哪些工具）'));
+  if (!wantGenerate) {
+    yield log('接下來：檢視取得的內容、補 CHANGELOG.md，然後執行「預覽產生」或「產生」', 'muted');
+    return true;
+  }
+  if (validation.errors > 0) {
+    yield log('取得的內容有驗證錯誤，先修正再產生', 'error');
+    return false;
+  }
+  yield title('產生');
+  return yield* generateFlow({ preset: { features, targets: preset.targets }, yes, reviewYes: yes });
 }
 
 function mtime(file) {

@@ -21,8 +21,9 @@ const HELP = `用法：node cli/index.js [指令] [參數]
   gitignore                      更新 .gitignore
   clean [--yes]                  generate --delete（先 dry run）
   fetch <來源> [--features a,b] [--ref r] [--path p] [--skills a,b]
-        [--conflict overwrite|skip] [--no-prune] [--token t] [--yes]
+        [--conflict overwrite|skip] [--no-prune] [--token t] [--generate] [--yes]
                                  從 GitHub 倉庫取得 skill／subagent／command 到 .rulesync/
+                                 --generate：取得後直接產生（工具照 -t 或 rulesync.jsonc）
                                  token 依序找：--token → 瀏覽器登入 → GITHUB_TOKEN → GH_TOKEN → gh
   login [--token-from gh|env]    登入 GitHub（純文字模式不開瀏覽器，只能借用 gh 或環境變數）
   logout [--yes]                 刪除本機的登入資訊
@@ -53,6 +54,7 @@ export function parseArgs(argv) {
     else if (a === '--skills') args.skills = (argv[++i] ?? '').split(',').filter(Boolean);
     else if (a === '--conflict') args.conflict = argv[++i] ?? 'overwrite';
     else if (a === '--no-prune') args.prune = false;
+    else if (a === '--generate') args.generate = true;
     // --token 會留在 shell history，建議改用環境變數 GITHUB_TOKEN
     else if (a === '--token') args.token = argv[++i] ?? '';
     else if (a === '--token-from') args.tokenFrom = argv[++i] ?? '';
@@ -78,6 +80,8 @@ const HEADLESS = {
       source: a._[1], features: a.features ?? ['skills'], ref: a.ref ?? '', path: a.path ?? '',
       skills: a.skills ?? [], conflict: a.conflict ?? 'overwrite', prune: a.prune ?? true,
       token: a.token || null,
+      // --generate：取得後直接產生（用 -t 指定的工具，預設照 rulesync.jsonc）
+      generate: a.generate ?? false, targets: a.preset.targets,
     },
   }),
   login: (a) => byId.login.start({ yes: true, preset: { tokenFrom: a.tokenFrom || undefined } }),
