@@ -36,8 +36,9 @@
 
 ## 實際結果（2026-09-24）
 
-- 最後建立的是 **GitHub App**（不是 OAuth App），client_id `Ov23lizQsDU1Eq1SeXGs`，已寫死在 `cli/lib/github-auth.js` 的 `CLIENT_ID`。
+- 最後建立的是 **GitHub App**（不是 OAuth App），client_id `Iv23libBFLDvIKpIYNy5`，已寫死在 `cli/lib/github-auth.js` 的 `CLIENT_ID`。
 - 設定：Where can this be installed = Any account；Repository permissions → Contents: Read-only；勾 Enable Device Flow；未勾 Expire user access tokens（token 不過期）。
 - 已用真實 client_id 呼叫 `POST /login/device/code` 成功（拿到登入碼），Device Flow 已啟用。
 - 與 OAuth App 的差異：不用組織「核准」，改為在帳號或組織**安裝** App 並勾選倉庫；「從遠端取得」的清單只會列已安裝的範圍。
-- 待補：App 的 slug（安裝頁網址 `https://github.com/apps/<slug>/installations/new`）填進 `APP_SLUG`，CLI 才能直接印出安裝連結。
+- App 的 slug 是 `ai-toolkit-cli`（安裝頁 `https://github.com/apps/ai-toolkit-cli/installations/new`），已填進 `APP_SLUG`。
+- 注意：第一次建的其實是 OAuth App（client_id `Ov23li…` 開頭），它的 token（`gho_` 開頭）呼叫 `/user/installations` 會回 403，「從清單選」會失敗。GitHub App 的 client_id 是 `Iv23li…` 開頭、token 是 `ghu_` 開頭。舊的 OAuth App 已不再使用，可刪除。

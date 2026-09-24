@@ -77,9 +77,9 @@ test('requestDeviceCode：沒有 client_id 就拒絕；device_flow_disabled 翻�
   assert.doesNotMatch(calls[0].body, /scope=/);
 });
 
-test('CLIENT_ID 已寫死，且 explainStatus 404 提到安裝 GitHub App', async () => {
+test('CLIENT_ID 是 GitHub App 的（Iv23li 開頭，不是 OAuth App 的 Ov23li），且 explainStatus 404 提到安裝 GitHub App', async () => {
   const { CLIENT_ID } = await import('../lib/github-auth.js');
-  assert.match(CLIENT_ID, /^Ov23li/);
+  assert.match(CLIENT_ID, /^Iv23li/);
   assert.match(explainStatus(404, 'x'), /GitHub App 尚未安裝/);
 });
 

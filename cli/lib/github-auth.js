@@ -9,9 +9,9 @@ import { spawn } from 'node:child_process';
 // GitHub App「AI Toolkit」的 client_id（公開識別碼，可以提交）。Device Flow 不需要 client_secret。
 // 權限只有 Contents: Read-only，token 不會過期（App 設定未勾 Expire user access tokens）。
 // 註冊步驟見 docs/tasks/remote-login-and-fetch/01-register-oauth-app.md。環境變數 AI_TOOLKIT_GITHUB_CLIENT_ID 可覆蓋（測試用）。
-export const CLIENT_ID = process.env.AI_TOOLKIT_GITHUB_CLIENT_ID || 'Ov23lizQsDU1Eq1SeXGs';
+export const CLIENT_ID = process.env.AI_TOOLKIT_GITHUB_CLIENT_ID || 'Iv23libBFLDvIKpIYNy5';
 // GitHub App 的 slug（安裝頁網址 https://github.com/apps/<slug>/installations/new 用）。留空就只顯示一般說明
-export const APP_SLUG = process.env.AI_TOOLKIT_GITHUB_APP_SLUG || '';
+export const APP_SLUG = process.env.AI_TOOLKIT_GITHUB_APP_SLUG || 'ai-toolkit-cli';
 export const installUrl = () => (APP_SLUG ? `https://github.com/apps/${APP_SLUG}/installations/new` : 'GitHub → Settings → Applications → 安裝這個 App');
 export const HOST = 'github.com';
 export const API_BASE = 'https://api.github.com';

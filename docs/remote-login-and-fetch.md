@@ -163,7 +163,7 @@ cli/
 
 | # | 問題 | 建議 |
 |---|---|---|
-| 1 | 用 OAuth App 還是 GitHub App | **已決定（2026-09-24）：GitHub App**（`Contents: Read-only`、未勾 Expire user access tokens，所以 token 不過期、不需 refresh）。client_id `Ov23lizQsDU1Eq1SeXGs` 寫死在 `cli/lib/github-auth.js`。登入只綁帳號；「從遠端取得」的清單來自 `/user/installations`（App 已安裝的帳號／組織）與 `/user/installations/{id}/repositories`。使用者要先在自己的帳號或組織安裝 App 並勾選倉庫 |
+| 1 | 用 OAuth App 還是 GitHub App | **已決定（2026-09-24）：GitHub App**（`Contents: Read-only`、未勾 Expire user access tokens，所以 token 不過期、不需 refresh）。client_id `Iv23libBFLDvIKpIYNy5` 寫死在 `cli/lib/github-auth.js`。登入只綁帳號；「從遠端取得」的清單來自 `/user/installations`（App 已安裝的帳號／組織）與 `/user/installations/{id}/repositories`。使用者要先在自己的帳號或組織安裝 App 並勾選倉庫 |
 | 2 | OAuth App 註冊在誰名下 | 註冊在公司 org 底下，client_id 寫進 `cli/lib/github-auth.js`（公開資訊，可提交） |
 | 3 | Token 存放 | 第一版明文檔 0600；Keychain 列為後續項目 |
 | 4 | 要不要支援 `install`（lockfile） | 第一版只做 `fetch`（因為 subagents 只能用 fetch）；`install` 留給其他專案自行宣告 |

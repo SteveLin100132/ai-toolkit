@@ -1,6 +1,6 @@
 {
   "name": "ai-toolkit-cli",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "license": "MIT",
   "type": "module",
   "description": "互動式 CLI：用 rulesync 管理團隊的 AI skill／subagent／command，從 GitHub 私有倉庫取得並產生 Claude Code 與 Codex CLI 格式",
