@@ -87,6 +87,12 @@ test('CLIENT_ID 是 GitHub App 的（Iv23li 開頭，不是 OAuth App 的 Ov23li
   assert.match(explainStatus(404, 'x'), /GitHub App 尚未安裝/);
 });
 
+test('configureUrl：個人帳號與組織的設定頁網址不同', async () => {
+  const { configureUrl } = await import('../lib/github-auth.js');
+  assert.equal(configureUrl({ login: 'alice', isUser: true, installationId: 12 }), 'https://github.com/settings/installations/12');
+  assert.equal(configureUrl({ login: 'acme', isUser: false, installationId: 34 }), 'https://github.com/organizations/acme/settings/installations/34');
+});
+
 test('pollForToken：authorization_pending 繼續、slow_down 拉長間隔、最後拿到 token', async () => {
   const replies = [
     { error: 'authorization_pending' },

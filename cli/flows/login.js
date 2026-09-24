@@ -1,5 +1,5 @@
 import {
-  HOSTS_FILE, CLIENT_ID, METHOD_LABELS, installUrl, getLogin, saveLogin, clearLogin, hasGh, ghToken, envToken,
+  HOSTS_FILE, CLIENT_ID, METHOD_LABELS, installUrl, configureUrl, getLogin, saveLogin, clearLogin, hasGh, ghToken, envToken,
   requestDeviceCode, pollForToken, openBrowser, fetchUser, maskToken,
 } from '../lib/github-auth.js';
 import { listOrgs } from '../lib/remote.js';
@@ -102,10 +102,22 @@ export function* flow({ preset = {}, yes = false } = {}) {
   yield log(`已以 ${user.value.login} 登入（${METHOD_LABELS[method]}）`, 'success');
   if (method === 'device') {
     // GitHub App 的 token 只看得到 App 已安裝的帳號／組織；gh 與環境變數的 token 是一般 token，不適用安裝清單
-    const orgs = yield call(() => listOrgs({ token }), '讀取已安裝這個 App 的帳號');
+    // 還沒安裝就順手開瀏覽器到安裝頁，裝好再讀一次，讓「從遠端取得」一進去就有清單
+    let orgs = yield call(() => listOrgs({ token }), '讀取已安裝這個 App 的帳號');
+    if (orgs.ok && orgs.value.length === 0 && !yes && /^https?:\/\//.test(installUrl())) {
+      yield log('這個 App 還沒安裝在任何帳號或組織，「從遠端取得」的清單會是空的', 'warning');
+      const go = yield confirm('要現在開啟瀏覽器安裝這個 App 嗎？（安裝時勾選要分享的倉庫）');
+      if (go) {
+        openBrowser(installUrl());
+        yield log(`已開啟瀏覽器：${installUrl()}`, 'info');
+        const done = yield confirm('在 GitHub 完成安裝後回來按確認，重新讀取清單');
+        if (done) orgs = yield call(() => listOrgs({ token }), '讀取已安裝這個 App 的帳號');
+      }
+    }
     if (orgs.ok) {
       const names = orgs.value.map((o) => `${o.login}（${o.description}）`);
       yield log(names.length ? `已安裝這個 App 的帳號／組織：${names.join('、')}` : '這個 App 還沒安裝在任何帳號或組織，「從遠端取得」的清單會是空的', names.length ? 'info' : 'warning');
+      for (const o of orgs.value.filter((x) => x.description !== '所有倉庫')) yield log(`${o.login} 勾選倉庫：${configureUrl(o)}`, 'muted');
       yield log(`要讀取某個組織的倉庫，該組織的管理員必須安裝這個 App 並勾選倉庫：${installUrl()}`, 'muted');
     } else {
       yield log(`讀取安裝清單失敗：${orgs.error.message}`, 'warning');

@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import { FEATURES, KIND_FEATURE, FETCHABLE_FEATURES, SOURCE_ROOT, displayPath } from '../lib/config.js';
 import { rulesync } from '../lib/run.js';
 import { listAll } from '../lib/inventory.js';
-import { resolveTokens, getLogin, saveRemote, METHOD_LABELS, GitHubError, installUrl } from '../lib/github-auth.js';
+import { resolveTokens, getLogin, saveRemote, METHOD_LABELS, GitHubError, installUrl, configureUrl, openBrowser } from '../lib/github-auth.js';
 import { parseRemote, listOrgs, listRepos, verifyAccess, hasRulesyncDir, listRemoteFeatures, listSkillTags, featureRoot } from '../lib/remote.js';
 import { markReview, REVIEW_FEATURES } from '../lib/review.js';
 import { snapshotUnselected, restoreUnselected } from '../lib/prune.js';
@@ -16,10 +16,33 @@ export const remoteMeta = { id: 'fetch:remote', label: '從遠端取得', hint: 
 
 const fetchable = () => Object.entries(FEATURES).filter(([value]) => FETCHABLE_FEATURES.includes(value));
 
+// 清單是空的（App 沒安裝，或安裝時沒勾倉庫）：開瀏覽器到 GitHub 的安裝／設定頁，做完回來重讀清單。
+// 回傳 'retry'（重讀）、'manual'（改手動輸入）或 null（取消）。純文字模式不開瀏覽器，只印網址
+function* installPrompt({ url, what, yes }) {
+  const isUrl = /^https?:\/\//.test(url);
+  if (yes || !isUrl) {
+    yield log(`${what}（${isUrl ? '安裝：' : ''}${url}），改用手動輸入`, 'warning');
+    return 'manual';
+  }
+  for (;;) {
+    const how = yield select(`${what}，要怎麼做？`, [
+      { value: 'open', label: '開啟瀏覽器到 GitHub 安裝／勾選倉庫', hint: '做完回來重新讀取清單' },
+      { value: 'manual', label: '手動輸入倉庫', hint: '不列清單，直接輸入 owner/repo' },
+      { value: 'cancel', label: '取消' },
+    ]);
+    if (how !== 'open') return how === 'manual' ? 'manual' : null;
+    openBrowser(url);
+    yield log(`已開啟瀏覽器：${url}`, 'info');
+    yield log('沒有自動開啟的話，請把網址貼到瀏覽器', 'muted');
+    const done = yield confirm('在 GitHub 完成後回來按確認，重新讀取清單');
+    if (done) return 'retry';
+  }
+}
+
 // 挑倉庫：上次使用 → 組織 → 倉庫清單（可過濾）→ 手動輸入。回傳 { parsed, fromList }（取消回 null）。
 // fromList：從清單（或上次從清單）選的，視為 rulesync 專案，內容在 .rulesync/ 底下；
 // 手動輸入的照 rulesync fetch 原生語意，路徑底下直接找 skills/、subagents/…（例如 anthropics/skills）
-function* pickRepo({ token, method }) {
+function* pickRepo({ token, method }, { yes = false } = {}) {
   const saved = getLogin();
   const first = [];
   if (saved?.remote) first.push({ value: 'last', label: `上次使用：${saved.remote}`, hint: saved.remoteFromList ? '從清單選的（.rulesync/ 專案）' : '手動輸入的' });
@@ -38,32 +61,42 @@ function* pickRepo({ token, method }) {
   if (how === 'last') return { parsed: parseRemote(saved.remote), fromList: Boolean(saved.remoteFromList) };
   if (how === 'manual') return yield* manual();
 
-  // GitHub App 的清單 = App 已安裝的帳號／組織
-  const orgs = yield call(() => listOrgs({ token }), '讀取已安裝這個 App 的帳號');
-  if (!orgs.ok) {
-    yield log(orgs.error.message, 'error');
-    return null;
+  // GitHub App 的清單 = App 已安裝的帳號／組織。還沒安裝就開瀏覽器到安裝頁，裝好重讀
+  let installed;
+  for (;;) {
+    const orgs = yield call(() => listOrgs({ token }), '讀取已安裝這個 App 的帳號');
+    if (!orgs.ok) {
+      yield log(orgs.error.message, 'error');
+      return null;
+    }
+    if (orgs.value.length) {
+      installed = orgs.value;
+      break;
+    }
+    const next = yield* installPrompt({ url: installUrl(), what: '這個 GitHub App 還沒安裝在任何帳號或組織', yes });
+    if (next === 'manual') return yield* manual();
+    if (next !== 'retry') return null;
   }
-  if (orgs.value.length === 0) {
-    yield log(`這個 GitHub App 還沒安裝在任何帳號或組織（安裝：${installUrl()}），改用手動輸入`, 'warning');
-    return yield* manual();
-  }
-  const org = yield select('哪個帳號或組織？', orgs.value.map((o) => ({
+  const org = yield select('哪個帳號或組織？', installed.map((o) => ({
     value: o.login, label: o.login, hint: `${o.isUser ? '個人帳號' : '組織'}，${o.description}`,
   })));
-  const owner = orgs.value.find((o) => o.login === org);
-  const repos = yield call(() => listRepos({ token, owner: org, installationId: owner.installationId }), `讀取 ${org} 的倉庫`);
-  if (!repos.ok) {
-    yield log(repos.error.message, 'error');
-    return null;
+  const owner = installed.find((o) => o.login === org);
+  // 安裝時沒勾倉庫：開瀏覽器到這個安裝的設定頁（Configure），勾完重讀
+  let list;
+  let truncated;
+  for (;;) {
+    const repos = yield call(() => listRepos({ token, owner: org, installationId: owner.installationId }), `讀取 ${org} 的倉庫`);
+    if (!repos.ok) {
+      yield log(repos.error.message, 'error');
+      return null;
+    }
+    ({ repos: list, truncated } = repos.value);
+    if (list.length) break;
+    const next = yield* installPrompt({ url: configureUrl(owner), what: `${org} 安裝這個 App 時沒有勾選任何倉庫`, yes });
+    if (next === 'manual') return yield* manual();
+    if (next !== 'retry') return null;
   }
-  let { repos: list } = repos.value;
-  if (repos.value.hint) yield log(repos.value.hint, 'warning');
-  if (repos.value.truncated) yield log('倉庫超過 500 個，只列出最近更新的 500 個；找不到請用手動輸入', 'warning');
-  if (list.length === 0) {
-    yield log(`${org} 底下沒有可存取的倉庫，改用手動輸入`, 'warning');
-    return yield* manual();
-  }
+  if (truncated) yield log('倉庫超過 500 個，只列出最近更新的 500 個；找不到請用手動輸入', 'warning');
   if (list.length > 50) {
     const kw = yield text(`共 ${list.length} 個倉庫，輸入關鍵字過濾（留空＝全部）`, { initial: '' });
     const k = kw.trim().toLowerCase();
@@ -129,7 +162,7 @@ export function* flow({ preset = {}, yes = false, remote = false } = {}) {
   let fromList = false;
   try {
     if (preset.source) parsed = parseRemote(preset.source);
-    else if (remote) ({ parsed, fromList } = (yield* pickRepo(auth)) ?? {});
+    else if (remote) ({ parsed, fromList } = (yield* pickRepo(auth, { yes })) ?? {});
     else parsed = yield* askSource();
   } catch (e) {
     yield log(e.message, 'error');

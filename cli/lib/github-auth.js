@@ -13,6 +13,10 @@ export const CLIENT_ID = process.env.AI_TOOLKIT_GITHUB_CLIENT_ID || 'Iv23libBFLD
 // GitHub App 的 slug（安裝頁網址 https://github.com/apps/<slug>/installations/new 用）。留空就只顯示一般說明
 export const APP_SLUG = process.env.AI_TOOLKIT_GITHUB_APP_SLUG || 'ai-toolkit-cli';
 export const installUrl = () => (APP_SLUG ? `https://github.com/apps/${APP_SLUG}/installations/new` : 'GitHub → Settings → Applications → 安裝這個 App');
+// 某個安裝（帳號／組織）的設定頁（Configure：勾選倉庫）。個人帳號與組織的網址不同
+export const configureUrl = ({ login, isUser, installationId }) => (isUser
+  ? `https://github.com/settings/installations/${installationId}`
+  : `https://github.com/organizations/${encodeURIComponent(login)}/settings/installations/${installationId}`);
 export const HOST = 'github.com';
 export const API_BASE = 'https://api.github.com';
 export const USER_AGENT = 'ai-toolkit';
