@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import { FEATURES, KIND_FEATURE, FETCHABLE_FEATURES, SOURCE_ROOT, displayPath } from '../lib/config.js';
 import { rulesync } from '../lib/run.js';
 import { listAll } from '../lib/inventory.js';
-import { resolveToken, getLogin, saveRemote, METHOD_LABELS, GitHubError, installUrl } from '../lib/github-auth.js';
+import { resolveTokens, getLogin, saveRemote, METHOD_LABELS, GitHubError, installUrl } from '../lib/github-auth.js';
 import { parseRemote, listOrgs, listRepos, verifyAccess, hasRulesyncDir, listRemoteFeatures, listSkillTags } from '../lib/remote.js';
 import { markReview, REVIEW_FEATURES } from '../lib/review.js';
 import { log, title, blank, select, multiselect, confirm, text, run, call } from './steps.js';
@@ -97,9 +97,10 @@ function* askSource(initial = '') {
 // options：純文字模式可先給 preset { source, features, ref, path, skills, conflict, prune, token }
 // remote：從選單「從遠端取得」進來，會先登入、挑倉庫、列清單
 export function* flow({ preset = {}, yes = false, remote = false } = {}) {
-  // token：--token → 環境變數 → 瀏覽器登入存的 → gh
-  let auth = yield call(() => resolveToken({ explicit: preset.token ?? null }), '尋找 GitHub token');
-  auth = auth.ok ? auth.value : null;
+  // token 候選：--token → 瀏覽器登入存的（GitHub App）→ 環境變數 → gh。先用第一個，讀不到倉庫時再換下一個
+  let candidates = yield call(() => resolveTokens({ explicit: preset.token ?? null }), '尋找 GitHub token');
+  candidates = candidates.ok ? candidates.value : [];
+  let auth = candidates[0] ?? null;
 
   if (remote && !auth) {
     yield log('「從遠端取得」需要先登入 GitHub', 'warning');
@@ -107,8 +108,9 @@ export function* flow({ preset = {}, yes = false, remote = false } = {}) {
     if (!go) return false;
     const ok = yield* loginFlow({});
     if (!ok) return false;
-    const again = yield call(() => resolveToken(), '尋找 GitHub token');
-    auth = again.ok ? again.value : null;
+    const again = yield call(() => resolveTokens(), '尋找 GitHub token');
+    candidates = again.ok ? again.value : [];
+    auth = candidates[0] ?? null;
     if (!auth) return false;
     yield blank();
     yield title('從遠端取得');
@@ -126,11 +128,21 @@ export function* flow({ preset = {}, yes = false, remote = false } = {}) {
   }
   if (!parsed) return false;
 
-  // 確認讀得到（有 token 才驗，沒 token 的公開倉庫交給 rulesync）
+  // 確認讀得到（有 token 才驗，沒 token 的公開倉庫交給 rulesync）。
+  // 第一個 token（通常是 GitHub App 的）讀不到時，換下一個候選（環境變數、gh）再試：App 沒安裝在該倉庫、但使用者本人有權限的情況
   let info = null;
   if (auth) {
-    const r = yield call(() => verifyAccess({ token: auth.token, owner: parsed.owner, repo: parsed.repo }), `確認 ${parsed.fullName}`);
-    if (!r.ok) {
+    let r = null;
+    for (const cand of candidates) {
+      r = yield call(() => verifyAccess({ token: cand.token, owner: parsed.owner, repo: parsed.repo }), `確認 ${parsed.fullName}（${METHOD_LABELS[cand.method]}）`);
+      if (r.ok) {
+        if (cand !== auth) yield log(`${METHOD_LABELS[auth.method]}的 token 讀不到這個倉庫，改用${METHOD_LABELS[cand.method]}`, 'warning');
+        auth = cand;
+        break;
+      }
+      if (!(r.error instanceof GitHubError) || ![403, 404].includes(r.error.status)) break;
+    }
+    if (!r?.ok) {
       yield log(r.error.message, 'error');
       if (r.error instanceof GitHubError && r.error.status === 401) yield log('請執行「登入遠端」重新登入', 'muted');
       return false;

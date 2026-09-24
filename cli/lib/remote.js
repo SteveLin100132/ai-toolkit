@@ -99,8 +99,17 @@ async function paginate(pathname, { token, query, maxPages = 5, key = null, cont
 // GitHub App 的使用者 token 只看得到「App 已安裝的帳號／組織」及安裝時勾選的倉庫，
 // 所以清單來自 /user/installations，而不是 /user/orgs。個人帳號放最前面。
 // 回傳 [{ login, isUser, installationId, description }]
+export const NOT_APP_TOKEN = '這個 token 不是本 CLI 的 GitHub App 發出的（例如來自環境變數 GITHUB_TOKEN／GH_TOKEN 或本機 gh），無法列出倉庫清單。請用「登入遠端」的「用瀏覽器登入 GitHub」，或改用「手動輸入」／「從 Git 取得」';
+
 export async function listOrgs({ token, fetchImpl } = {}) {
-  const { items } = await paginate('/user/installations', { token, fetchImpl, key: 'installations', maxPages: 2, context: '讀取已安裝的帳號' });
+  let items;
+  try {
+    ({ items } = await paginate('/user/installations', { token, fetchImpl, key: 'installations', maxPages: 2, context: '讀取已安裝的帳號' }));
+  } catch (e) {
+    // /user/installations 只接受 GitHub App 的 user token，一般 token 會回 403
+    if (e instanceof GitHubError && e.status === 403) throw new GitHubError(NOT_APP_TOKEN, { status: 403, code: 'not_app_token' });
+    throw e;
+  }
   const list = items
     .filter((i) => i.account?.login)
     .map((i) => ({

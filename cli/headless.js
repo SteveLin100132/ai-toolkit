@@ -23,7 +23,7 @@ const HELP = `用法：node cli/index.js [指令] [參數]
   fetch <來源> [--features a,b] [--ref r] [--path p] [--skills a,b]
         [--conflict overwrite|skip] [--no-prune] [--token t] [--yes]
                                  從 GitHub 倉庫取得 skill／subagent／command 到 .rulesync/
-                                 token 依序找：--token → GITHUB_TOKEN → GH_TOKEN → 登入資訊 → gh
+                                 token 依序找：--token → 瀏覽器登入 → GITHUB_TOKEN → GH_TOKEN → gh
   login [--token-from gh|env]    登入 GitHub（純文字模式不開瀏覽器，只能借用 gh 或環境變數）
   logout [--yes]                 刪除本機的登入資訊
   repos [--org <組織>]           列出登入帳號能存取的倉庫（一行一個 owner/repo）

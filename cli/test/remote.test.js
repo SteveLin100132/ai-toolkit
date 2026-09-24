@@ -62,6 +62,11 @@ test('listOrgs：來自 /user/installations，個人帳號在最前，分頁跟�
   assert.deepEqual(await listOrgs({ token: 't', fetchImpl: fake({ '/user/installations': { json: { installations: [] } } }).fetchImpl }), []);
 });
 
+test('listOrgs：一般 token 呼叫 /user/installations 回 403 時，說明要用瀏覽器登入', async () => {
+  const { fetchImpl } = fake({ '/user/installations': { status: 403, json: { message: 'Resource not accessible by personal access token' } } });
+  await assert.rejects(() => listOrgs({ token: 'ghp_classic', fetchImpl }), (e) => e.code === 'not_app_token' && /用瀏覽器登入 GitHub/.test(e.message));
+});
+
 test('listRepos：從安裝底下列倉庫，沒勾選倉庫時帶 hint；封存的倉庫略過', async () => {
   const repo = (name, priv, archived = false) => ({ full_name: `acme/${name}`, name, owner: { login: 'acme' }, private: priv, default_branch: 'main', archived, pushed_at: '2026-09-01T00:00:00Z' });
   const { fetchImpl, calls } = fake({ '/user/installations/2/repositories': { json: { repositories: [repo('pub', false), repo('old', false, true)] } } });

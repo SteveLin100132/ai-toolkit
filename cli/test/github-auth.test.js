@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {
-  maskToken, readHosts, saveLogin, saveRemote, clearLogin, getLogin, resolveToken, envToken,
+  maskToken, readHosts, saveLogin, saveRemote, clearLogin, getLogin, resolveToken, resolveTokens, envToken,
   requestDeviceCode, pollForToken, explainStatus, GitHubError,
 } from '../lib/github-auth.js';
 
@@ -39,13 +39,16 @@ test('hosts.json：建立時權限 0600、只刪該 host、remote 只由 saveRem
   assert.equal(clearLogin(file), false);
 });
 
-test('resolveToken 的順序：explicit → 環境變數 → hosts.json（device）→ 無', async () => {
+test('resolveToken 的順序：explicit → hosts.json（device）→ 環境變數 → 無；resolveTokens 回傳全部候選', async () => {
   const file = tmpFile();
   assert.equal(await resolveToken({ env: {}, file, allowGh: false }), null);
-  saveLogin({ login: 'a', method: 'device', token: 'gho_saved' }, file);
-  assert.deepEqual(await resolveToken({ env: {}, file, allowGh: false }), { token: 'gho_saved', method: 'device' });
-  assert.deepEqual(await resolveToken({ env: { GH_TOKEN: 'gh_env' }, file, allowGh: false }), { token: 'gh_env', method: 'env' });
-  assert.deepEqual(await resolveToken({ env: { GITHUB_TOKEN: 'first', GH_TOKEN: 'second' }, file, allowGh: false }), { token: 'first', method: 'env' });
+  saveLogin({ login: 'a', method: 'device', token: 'ghu_saved' }, file);
+  assert.deepEqual(await resolveToken({ env: {}, file, allowGh: false }), { token: 'ghu_saved', method: 'device' });
+  // 瀏覽器登入（GitHub App 的 token）優先於環境變數，環境變數當備援
+  assert.deepEqual(await resolveTokens({ env: { GH_TOKEN: 'gh_env' }, file, allowGh: false }), [
+    { token: 'ghu_saved', method: 'device' }, { token: 'gh_env', method: 'env' },
+  ]);
+  assert.deepEqual(await resolveToken({ env: { GITHUB_TOKEN: 'first', GH_TOKEN: 'second' }, file: tmpFile(), allowGh: false }), { token: 'first', method: 'env' });
   assert.deepEqual(await resolveToken({ explicit: 'cli', env: { GITHUB_TOKEN: 'x' }, file, allowGh: false }), { token: 'cli', method: 'explicit' });
   // hosts.json 記的是 gh／env 時不存 token，不會被拿來用
   saveLogin({ login: 'a', method: 'gh' }, file);

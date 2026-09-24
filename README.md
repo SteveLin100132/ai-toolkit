@@ -83,7 +83,8 @@ npm test
 
 「從遠端取得」「從 Git 取得」注意事項：
 - 預設會**清理**取得的 skill 目錄，遠端沒有的檔案（包含您自己加的）會被刪除。要保留就選「不清理」（`--no-prune`）。
-- 私有倉庫要先「登入遠端」（見下一節）。token 依序找：`--token` → `GITHUB_TOKEN` → `GH_TOKEN` → 登入遠端存的 → 本機 `gh`；交給 rulesync 時用環境變數注入，不會出現在畫面上的指令裡。
+- 私有倉庫要先「登入遠端」（見下一節）。token 依序找：`--token` → 登入遠端的瀏覽器登入（GitHub App）→ `GITHUB_TOKEN` → `GH_TOKEN` → 本機 `gh`；第一個讀不到倉庫時會自動換下一個再試。交給 rulesync 時用環境變數注入，不會出現在畫面上的指令裡。
+- 「從遠端取得」的倉庫清單只有 GitHub App 的 token（瀏覽器登入）能列；用環境變數或 `gh` 的 token 會得到說明，請改用瀏覽器登入或「手動輸入」。
 - 只支援 github.com：rulesync 17.0.0 的 `fetch` 只認得 github.com 與 gitlab.com，GitHub Enterprise Server 目前做不到。
 - 「從遠端取得」會先列出遠端 `.rulesync/` 有哪些 skill、subagent、command；skill 可以勾選，subagent 與 command 只能整批取得（rulesync 沒有限定參數）。只選一個 skill 時可以挑 `<skill>/vX.Y.Z` 的版本 tag。遠端的 hooks、rules、MCP 不提供取得，因為會整份覆寫本機檔案。
 - 取得的 subagent 與 command 一產生就會在您的機器上生效，所以 CLI 會寫下 `.rulesync/.needs-review.json`（已列入 `.gitignore`）：下次「產生」會先列出這些項目、跑 dry run、要求確認後才寫入。純文字模式要帶 `--yes` 才會略過這個確認。

@@ -125,20 +125,27 @@ export function envToken(env = process.env) {
   return env.GITHUB_TOKEN || env.GH_TOKEN || null;
 }
 
-// 解析順序：explicit（--token）→ GITHUB_TOKEN → GH_TOKEN → hosts.json（device）→ gh auth token。
-// 回傳 { token, method }，找不到回傳 null。
-// hosts.json 記的是 gh／env 時不會存 token，照同樣的順序重新找。
-export async function resolveToken({ explicit = null, env = process.env, file = HOSTS_FILE, allowGh = true } = {}) {
-  if (explicit) return { token: explicit, method: 'explicit' };
-  const fromEnv = envToken(env);
-  if (fromEnv) return { token: fromEnv, method: 'env' };
+// 所有找得到的 token，依優先順序：explicit（--token）→ hosts.json 的瀏覽器登入（device）→ GITHUB_TOKEN → GH_TOKEN → gh auth token。
+// 瀏覽器登入排在環境變數前面：它是使用者在本 CLI 明確做的登入，而且只有它是 GitHub App 的 token，
+// 「從遠端取得」列倉庫清單（/user/installations）只接受這種 token。
+// 回傳 [{ token, method }]，可能是空陣列。hosts.json 記的是 gh／env 時不會存 token，照同樣的順序重新找。
+export async function resolveTokens({ explicit = null, env = process.env, file = HOSTS_FILE, allowGh = true } = {}) {
+  const list = [];
+  if (explicit) list.push({ token: explicit, method: 'explicit' });
   const saved = getLogin(file);
-  if (saved?.method === 'device' && saved.token) return { token: saved.token, method: 'device' };
+  if (saved?.method === 'device' && saved.token) list.push({ token: saved.token, method: 'device' });
+  const fromEnv = envToken(env);
+  if (fromEnv) list.push({ token: fromEnv, method: 'env' });
   if (allowGh) {
     const t = await ghToken();
-    if (t) return { token: t, method: 'gh' };
+    if (t) list.push({ token: t, method: 'gh' });
   }
-  return null;
+  return list;
+}
+
+// 第一個找得到的 token，找不到回傳 null
+export async function resolveToken(opts) {
+  return (await resolveTokens(opts))[0] ?? null;
 }
 
 export const METHOD_LABELS = {
