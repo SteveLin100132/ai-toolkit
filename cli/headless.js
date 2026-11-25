@@ -14,7 +14,9 @@ const HELP = `用法：node cli/index.js [指令] [參數]
   init                           用範本建立 rulesync.jsonc 與 .rulesync/（已存在就不動）
                                  其他需要設定檔的指令遇到沒有 rulesync.jsonc 時也會自動建立
   validate                       驗證 .rulesync/ 原始檔
-  generate [--dry-run]           產生（或預覽）專案輸出
+  generate [--dry-run] [--skills a,b] [--subagents a,b]
+                                 產生（或預覽）專案輸出
+                                 --skills／--subagents：只產生這些項目，其他的輸出不會動
   install-global [--dry-run] [--yes]
                                  安裝到 ~/.claude、~/.agents、~/.codex（會備份）
   doctor                         rulesync doctor
@@ -53,6 +55,7 @@ export function parseArgs(argv) {
     else if (a === '--ref') args.ref = argv[++i] ?? '';
     else if (a === '--path') args.path = argv[++i] ?? '';
     else if (a === '--skills') args.skills = (argv[++i] ?? '').split(',').filter(Boolean);
+    else if (a === '--subagents') args.subagents = (argv[++i] ?? '').split(',').filter(Boolean);
     else if (a === '--conflict') args.conflict = argv[++i] ?? 'overwrite';
     else if (a === '--no-prune') args.prune = false;
     else if (a === '--generate') args.generate = true;
@@ -70,7 +73,10 @@ export function parseArgs(argv) {
 const HEADLESS = {
   validate: (a) => byId.validate.start(),
   // 產生本來不用確認（yes: true）；「尚未檢視的遠端項目」則要明確帶 --yes 才會略過確認
-  generate: (a) => byId.generate.start({ dryRun: a.dryRun, yes: true, reviewYes: a.yes, preset: a.preset }),
+  generate: (a) => byId.generate.start({
+    dryRun: a.dryRun, yes: true, reviewYes: a.yes,
+    preset: a.skills || a.subagents ? { ...a.preset, items: { skills: a.skills, subagents: a.subagents } } : a.preset,
+  }),
   'install-global': (a) => byId['install-global'].start({ mode: a.dryRun ? 'dry' : 'install', yes: a.yes, preset: a.preset }),
   doctor: () => byId.doctor.start(),
   gitignore: () => byId.gitignore.start({ yes: true }),

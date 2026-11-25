@@ -48,12 +48,14 @@ npm test
 
 | 選項 | 功能 | 會問什麼 |
 |---|---|---|
-| 4. 預覽產生（dry run） | 列出會寫出哪些檔案，不寫入 | 工具、功能 |
-| 5. 產生 | 先驗證，再寫入專案的 `.claude/`、`.agents/`、`.codex/` | 工具、功能、確認 |
+| 4. 預覽產生（dry run） | 列出會寫出哪些檔案，不寫入 | 工具、功能、要產生哪些 skill／subagent |
+| 5. 產生 | 先驗證，再寫入專案的 `.claude/`、`.agents/`、`.codex/` | 工具、功能、要產生哪些 skill／subagent、確認 |
 | 6. 安裝到全域 | 寫入 `~/.claude`、`~/.claude.json`、`~/.agents`、`~/.codex`；也可以還原備份 | 安裝／dry run／還原、工具、功能、確認 |
 | 7. 清理輸出 | `generate --delete`：刪除專案輸出目錄中不是由 `.rulesync/` 產生的檔案，然後**重新產生**。這是「讓輸出跟 `.rulesync/` 一致」，不是反安裝，`.rulesync/` 有的項目會留著 | 工具、功能、輸入 `yes` |
 | 8. 移除輸出 | 反安裝：刪除由 `.rulesync/` 產生的專案輸出（`.claude/`、`.agents/`、`.codex/`、`CLAUDE.md`、`AGENTS.md`…），**不重新產生**。只動對得上 `.rulesync/` 目前項目的檔案，同目錄裡您自己放的不動；`.claude/settings.json`、`.mcp.json`、`.codex/config.toml` 只拿掉 rulesync 寫的那一段 | 工具、功能、輸入 `yes` |
 | 9. 更新 .gitignore | 依 `rulesync.jsonc` 的 targets 與 features 加入忽略規則 | 不問 |
+
+「預覽產生」與「產生」選到 Skills 或 Subagents 時，會列出 `.rulesync/` 裡的項目讓您勾選（預設全勾）。只勾部分時，CLI 把 `.rulesync/` 複製到暫存目錄、拿掉沒勾的，再用 `--input-roots` 產生：勾選的會覆寫輸出，沒勾的輸出原樣保留，驗證也只檢查勾選的項目。Rules、Hooks、MCP 會整份覆寫，所以不提供逐項挑選。`rulesync.jsonc` 設了 `"delete": true` 時，沒勾的輸出會被刪掉，所以這時不提供挑選、一律全部產生。
 
 **遠端倉庫**
 
@@ -132,6 +134,7 @@ npm run login                        # 純文字模式不開瀏覽器：有 GITH
 npm run repos -- --org <組織>        # 列出登入帳號能存取的倉庫（一行一個 owner/repo）
 npm run logout -- --yes
 npm run generate -- --yes            # 有「尚未檢視的遠端項目」時，不帶 --yes 會在 dry run 後中止
+npm run generate -- --skills a,b --subagents x   # 只產生這些項目，其他的輸出不動（delete: true 時會中止）
 node cli/index.js docs               # 列出文件；docs <識別碼> 印出、docs --search <關鍵字> 搜尋
 node cli/index.js --help             # 完整說明，含 -t/--targets、-f/--features
 npm run rulesync -- <參數>            # 直接呼叫專案內的 rulesync
