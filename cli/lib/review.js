@@ -38,6 +38,20 @@ export function markReview({ source, items }, file = REVIEW_FILE) {
   return current;
 }
 
+// 只清掉已檢視的項目（產生時只挑了部分）。清完沒剩就刪掉整個標記。回傳剩下的項目數
+export function clearReviewItems(done, file = REVIEW_FILE) {
+  const current = readReview(file);
+  if (!current) return 0;
+  const doneKeys = new Set(done.map((i) => `${i.feature}:${i.name}`));
+  const rest = current.items.filter((i) => !doneKeys.has(`${i.feature}:${i.name}`));
+  if (rest.length === 0) {
+    clearReview(file);
+    return 0;
+  }
+  fs.writeFileSync(file, JSON.stringify({ ...current, items: rest, updatedAt: new Date().toISOString() }, null, 2) + '\n');
+  return rest.length;
+}
+
 export function clearReview(file = REVIEW_FILE) {
   try {
     fs.rmSync(file);

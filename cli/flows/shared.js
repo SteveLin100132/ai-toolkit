@@ -2,9 +2,20 @@ import { TARGETS, FEATURES, ROOT, SOURCE_ROOT, MISSING_CONFIG, loadConfig, creat
 import { validateAll } from '../lib/validate.js';
 import { log, title, blank, multiselect, confirm } from './steps.js';
 
-// 印出驗證結果，回傳 { errors, warnings }
-export function* validateStep({ features } = {}) {
-  const result = validateAll({ features });
+// 印出驗證結果，回傳 { errors, warnings }。
+// picks：產生時逐項挑選的結果（{ skills: [...], subagents: [...] }），沒勾選的項目不檢查
+export function* validateStep({ features, picks = {} } = {}) {
+  const all = validateAll({ features });
+  const kindFeature = { skill: 'skills', subagent: 'subagents' };
+  const items = all.items.filter((i) => {
+    const keep = picks[kindFeature[i.kind]];
+    return !Array.isArray(keep) || keep.includes(i.name);
+  });
+  const result = {
+    items,
+    errors: items.reduce((n, r) => n + r.errors.length, 0),
+    warnings: items.reduce((n, r) => n + r.warnings.length, 0),
+  };
   yield title('驗證 .rulesync/ 原始檔');
   if (result.items.length === 0) yield log('沒有任何可檢查的項目', 'muted');
   for (const item of result.items) {

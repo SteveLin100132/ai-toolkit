@@ -48,28 +48,31 @@ npm test
 
 | 選項 | 功能 | 會問什麼 |
 |---|---|---|
-| 4. 預覽產生（dry run） | 列出會寫出哪些檔案，不寫入 | 工具、功能 |
-| 5. 產生 | 先驗證，再寫入專案的 `.claude/`、`.agents/`、`.codex/` | 工具、功能、確認 |
+| 4. 預覽產生（dry run） | 列出會寫出哪些檔案，不寫入 | 工具、功能、要產生哪些 skill／subagent |
+| 5. 產生 | 先驗證，再寫入專案的 `.claude/`、`.agents/`、`.codex/` | 工具、功能、要產生哪些 skill／subagent、確認 |
 | 6. 安裝到全域 | 寫入 `~/.claude`、`~/.claude.json`、`~/.agents`、`~/.codex`；也可以還原備份 | 安裝／dry run／還原、工具、功能、確認 |
-| 7. 清理輸出 | `generate --delete`，刪除專案輸出目錄中不是由 `.rulesync/` 產生的檔案 | 工具、功能、輸入 `yes` |
-| 8. 更新 .gitignore | 依 `rulesync.jsonc` 的 targets 與 features 加入忽略規則 | 不問 |
+| 7. 清理輸出 | `generate --delete`：刪除專案輸出目錄中不是由 `.rulesync/` 產生的檔案，然後**重新產生**。這是「讓輸出跟 `.rulesync/` 一致」，不是反安裝，`.rulesync/` 有的項目會留著 | 工具、功能、輸入 `yes` |
+| 8. 移除輸出 | 反安裝：刪除由 `.rulesync/` 產生的專案輸出（`.claude/`、`.agents/`、`.codex/`、`CLAUDE.md`、`AGENTS.md`…），**不重新產生**。只動對得上 `.rulesync/` 目前項目的檔案，同目錄裡您自己放的不動；`.claude/settings.json`、`.mcp.json`、`.codex/config.toml` 只拿掉 rulesync 寫的那一段 | 工具、功能、輸入 `yes` |
+| 9. 更新 .gitignore | 依 `rulesync.jsonc` 的 targets 與 features 加入忽略規則 | 不問 |
+
+「預覽產生」與「產生」選到 Skills 或 Subagents 時，會列出 `.rulesync/` 裡的項目讓您勾選（預設全勾）。只勾部分時，CLI 把 `.rulesync/` 複製到暫存目錄、拿掉沒勾的，再用 `--input-roots` 產生：勾選的會覆寫輸出，沒勾的輸出原樣保留，驗證也只檢查勾選的項目。Rules、Hooks、MCP 會整份覆寫，所以不提供逐項挑選。`rulesync.jsonc` 設了 `"delete": true` 時，沒勾的輸出會被刪掉，所以這時不提供挑選、一律全部產生。
 
 **遠端倉庫**
 
 | 選項 | 功能 | 會問什麼 |
 |---|---|---|
-| 9. 登入遠端 | 登入 GitHub 帳號（瀏覽器 Device Flow、借用本機 `gh`，或環境變數）；主選單的說明欄會顯示目前的登入狀態 | 登入方式；瀏覽器登入會顯示登入碼 |
-| 10. 從遠端取得 | 登入後從清單挑組織 → 倉庫 → 版本 → 項目，再 `rulesync fetch` 到 `.rulesync/`。從清單選的倉庫視為 rulesync 專案（自動帶 `--path .rulesync`）；手動輸入的照 rulesync 原生語意 | 倉庫（上次使用／清單／手動）、版本、功能、skill（可選版本 tag）、同名處理、是否清理、確認 |
-| 11. 從 Git 取得 | 手動輸入 GitHub 倉庫，`rulesync fetch` 抓 skill／subagent／command 到 `.rulesync/`；有登入就自動帶 token | 來源、ref、子目錄、功能、限定 skill、同名處理、是否清理、確認 |
-| 12. 發布版本 | 為某個 skill 打 `<skill-name>/vX.Y.Z` tag | skill、版本、確認、是否推送 |
+| 10. 登入遠端 | 登入 GitHub 帳號（瀏覽器 Device Flow、借用本機 `gh`，或環境變數）；主選單的說明欄會顯示目前的登入狀態 | 登入方式；瀏覽器登入會顯示登入碼 |
+| 11. 從遠端取得 | 登入後從清單挑組織 → 倉庫 → 版本 → 項目，再 `rulesync fetch` 到 `.rulesync/`。從清單選的倉庫視為 rulesync 專案（自動帶 `--path .rulesync`）；手動輸入的照 rulesync 原生語意 | 倉庫（上次使用／清單／手動）、版本、功能、skill（可選版本 tag）、同名處理、是否清理、確認 |
+| 12. 從 Git 取得 | 手動輸入 GitHub 倉庫，`rulesync fetch` 抓 skill／subagent／command 到 `.rulesync/`；有登入就自動帶 token | 來源、ref、子目錄、功能、限定 skill、同名處理、是否清理、確認 |
+| 13. 發布版本 | 為某個 skill 打 `<skill-name>/vX.Y.Z` tag | skill、版本、確認、是否推送 |
 
 **其他**
 
 | 選項 | 功能 | 會問什麼 |
 |---|---|---|
-| 13. 診斷 | `rulesync doctor`，唯讀 | 不問 |
-| 14. 查閱 rulesync 文件 | 讀取內建於 rulesync 的官方文件（可捲動），或全文搜尋 | 瀏覽／搜尋、文件或關鍵字 |
-| 15. 登出遠端 | 刪除本機儲存的 GitHub 登入（不撤銷 GitHub 端授權） | 確認 |
+| 14. 診斷 | `rulesync doctor`，唯讀 | 不問 |
+| 15. 查閱 rulesync 文件 | 讀取內建於 rulesync 的官方文件（可捲動），或全文搜尋 | 瀏覽／搜尋、文件或關鍵字 |
+| 16. 登出遠端 | 刪除本機儲存的 GitHub 登入（不撤銷 GitHub 端授權） | 確認 |
 
 選功能時，所選工具在這個層級都不支援的功能會標成 `[-]` 停用並寫出原因，不會從清單拿掉；只有部分工具支援時，說明欄會寫出哪些工具會處理。目前唯一的例子是 **Codex CLI 的 Commands 只支援全域**：專案層級的「產生」不會寫出 Codex 的 command，產生完會再提醒一次，要用「安裝到全域」才會寫到 `~/.codex/prompts/`。
 
@@ -124,12 +127,14 @@ npm run doctor
 npm run gitignore
 npm run install-global:dry
 npm run install-global -- --yes      # 仍會備份
-npm run clean -- --yes
+npm run clean -- --yes               # 刪多出來的檔案後重新產生
+npm run remove -- --yes              # 反安裝：移除產生的輸出，不重新產生
 node cli/index.js fetch anthropics/skills --skills skill-creator --yes
 npm run login                        # 純文字模式不開瀏覽器：有 GITHUB_TOKEN 就用它，否則借用 gh；--token-from gh|env 可指定
 npm run repos -- --org <組織>        # 列出登入帳號能存取的倉庫（一行一個 owner/repo）
 npm run logout -- --yes
 npm run generate -- --yes            # 有「尚未檢視的遠端項目」時，不帶 --yes 會在 dry run 後中止
+npm run generate -- --skills a,b --subagents x   # 只產生這些項目，其他的輸出不動（delete: true 時會中止）
 node cli/index.js docs               # 列出文件；docs <識別碼> 印出、docs --search <關鍵字> 搜尋
 node cli/index.js --help             # 完整說明，含 -t/--targets、-f/--features
 npm run rulesync -- <參數>            # 直接呼叫專案內的 rulesync
@@ -217,7 +222,8 @@ Git 只追蹤原始檔。產生出來的檔案（`.claude/`、`.agents/`、`.cod
 - **只修改 `.rulesync/` 底下的原始檔**，以及 repo 自己的 README.md、cli/、rulesync.jsonc、package.json。
 - **產生出來的檔案一律不要手動編輯**：`.claude/`、`.agents/`、`.codex/` 和 `~/` 底下的對應目錄。下次產生就會被覆蓋。
 - 不要直接寫入全域目錄，一律透過「安裝到全域」。由 AI 工具代為操作時，必須先取得使用者同意。
-- 「清理輸出」（`--delete`）會刪除所有非本 repo 管理的項目，CLI 一定先 dry run 並要求輸入 `yes`。它只清理專案目錄，不會動到全域目錄。
+- 「清理輸出」（`--delete`）會刪除所有非本 repo 管理的項目**然後重新產生**，CLI 一定先 dry run 並要求輸入 `yes`。它只清理專案目錄，不會動到全域目錄。
+- 「移除輸出」會先列出要刪的檔案並要求輸入 `yes`。`CLAUDE.md`、`AGENTS.md` 是整份由 rulesync 產生的，會整個刪除，手動改過的內容會一起消失。只處理專案目錄。
 
 ### rulesync 設定注意事項
 

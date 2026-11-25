@@ -14,12 +14,15 @@ const HELP = `用法：node cli/index.js [指令] [參數]
   init                           用範本建立 rulesync.jsonc 與 .rulesync/（已存在就不動）
                                  其他需要設定檔的指令遇到沒有 rulesync.jsonc 時也會自動建立
   validate                       驗證 .rulesync/ 原始檔
-  generate [--dry-run]           產生（或預覽）專案輸出
+  generate [--dry-run] [--skills a,b] [--subagents a,b]
+                                 產生（或預覽）專案輸出
+                                 --skills／--subagents：只產生這些項目，其他的輸出不會動
   install-global [--dry-run] [--yes]
                                  安裝到 ~/.claude、~/.agents、~/.codex（會備份）
   doctor                         rulesync doctor
   gitignore                      更新 .gitignore
-  clean [--yes]                  generate --delete（先 dry run）
+  clean [--yes]                  generate --delete：刪掉輸出目錄裡多出來的檔案後重新產生（先 dry run）
+  remove [--yes]                 移除由 .rulesync/ 產生的專案輸出，不重新產生（先列清單）
   fetch <來源> [--features a,b] [--ref r] [--path p] [--skills a,b]
         [--conflict overwrite|skip] [--no-prune] [--token t] [--generate] [--yes]
                                  從 GitHub 倉庫取得 skill／subagent／command 到 .rulesync/
@@ -52,6 +55,7 @@ export function parseArgs(argv) {
     else if (a === '--ref') args.ref = argv[++i] ?? '';
     else if (a === '--path') args.path = argv[++i] ?? '';
     else if (a === '--skills') args.skills = (argv[++i] ?? '').split(',').filter(Boolean);
+    else if (a === '--subagents') args.subagents = (argv[++i] ?? '').split(',').filter(Boolean);
     else if (a === '--conflict') args.conflict = argv[++i] ?? 'overwrite';
     else if (a === '--no-prune') args.prune = false;
     else if (a === '--generate') args.generate = true;
@@ -69,11 +73,15 @@ export function parseArgs(argv) {
 const HEADLESS = {
   validate: (a) => byId.validate.start(),
   // 產生本來不用確認（yes: true）；「尚未檢視的遠端項目」則要明確帶 --yes 才會略過確認
-  generate: (a) => byId.generate.start({ dryRun: a.dryRun, yes: true, reviewYes: a.yes, preset: a.preset }),
+  generate: (a) => byId.generate.start({
+    dryRun: a.dryRun, yes: true, reviewYes: a.yes,
+    preset: a.skills || a.subagents ? { ...a.preset, items: { skills: a.skills, subagents: a.subagents } } : a.preset,
+  }),
   'install-global': (a) => byId['install-global'].start({ mode: a.dryRun ? 'dry' : 'install', yes: a.yes, preset: a.preset }),
   doctor: () => byId.doctor.start(),
   gitignore: () => byId.gitignore.start({ yes: true }),
   clean: (a) => byId.clean.start({ yes: a.yes, preset: a.preset }),
+  remove: (a) => byId.remove.start({ yes: a.yes, preset: a.preset }),
   fetch: (a) => byId.fetch.start({
     yes: a.yes,
     preset: {
@@ -150,7 +158,7 @@ export async function runHeadless(args) {
   }
   // 純文字模式不問問題：沒給參數就照 rulesync.jsonc。沒有設定檔時，需要它的指令先用範本建立，再讀一次
   let config = loadConfig();
-  if (!config.exists && ['generate', 'install-global', 'clean', 'gitignore'].includes(command)) {
+  if (!config.exists && ['generate', 'install-global', 'clean', 'remove', 'gitignore'].includes(command)) {
     const { file } = createConfig();
     process.stdout.write(chalk.hex(color.warning)(`! 找不到 rulesync.jsonc，已用範本建立 ${file} 與 .rulesync/\n`));
     config = loadConfig();
