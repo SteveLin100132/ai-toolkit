@@ -13,13 +13,38 @@ export const meta = { id: 'import', label: '匯入', hint: '把 Claude Code 或 
 function describeSource(sourceRoot, target, feature, global) {
   return outputRels(target, feature, { global }).map((rel) => {
     const p = path.join(sourceRoot, rel);
-    if (!fs.existsSync(p)) return { path: p, exists: false, names: [] };
-    if (isFileOutput(p)) return { path: p, exists: true, names: null };
-    const names = fs.readdirSync(p, { withFileTypes: true })
+    if (!fs.existsSync(p)) return { path: p, exists: false, names: [], entries: [] };
+    if (isFileOutput(p)) return { path: p, exists: true, names: null, entries: [] };
+    const entries = fs.readdirSync(p, { withFileTypes: true })
       .filter((e) => !e.name.startsWith('.'))
-      .map((e) => e.name.replace(/\.(md|toml)$/, ''));
-    return { path: p, exists: names.length > 0, names };
+      .map((e) => ({ name: e.name.replace(/\.(md|toml)$/, ''), path: path.join(p, e.name) }));
+    return { path: p, exists: entries.length > 0, names: entries.map((e) => e.name), entries };
   });
+}
+
+// 可以逐項挑選的功能。rules、hooks、mcp 會合成或合併成單一檔案，維持整批
+const PICKABLE = ['skills', 'subagents', 'commands'];
+
+// 在執行 rulesync import 之前逐項挑選，沒勾的不放進暫存區。
+// 這樣沒勾的項目就算 frontmatter 有問題，也不會讓整批匯入失敗（rulesync 遇到一個錯就全部中止）。
+// 回傳 { features, exclude }：exclude 是沒勾的項目在來源的路徑；一個都沒勾的功能會拿掉
+export function* pickSourceItems(sources) {
+  const exclude = [];
+  const dropped = [];
+  for (const [feature, list] of sources) {
+    if (!PICKABLE.includes(feature)) continue;
+    const entries = list.flatMap((s) => s.entries);
+    if (entries.length < 2) continue;
+    const names = [...new Set(entries.map((e) => e.name))];
+    const chosen = yield multiselect(`要匯入哪些 ${FEATURES[feature].label}？`, names.map((n) => ({ value: n, label: n, selected: true })));
+    if (chosen.length === 0) {
+      yield log(`${FEATURES[feature].label} 一個都沒選，略過這個功能`, 'muted');
+      dropped.push(feature);
+      continue;
+    }
+    for (const e of entries) if (!chosen.includes(e.name)) exclude.push(e.path);
+  }
+  return { dropped, exclude };
 }
 
 // 匯入的來源只有一個工具，不支援就停用；停用原因的「請用…」是給產生用的，這裡改成請切換層級
@@ -44,7 +69,7 @@ export function* flow() {
     { value: 'global', label: '使用者層級（全域）', hint: '~/.claude/、~/.claude.json、~/.agents/、~/.codex/' },
   ]);
   const global = scope === 'global';
-  const features = yield multiselect(
+  let features = yield multiselect(
     `要匯入哪些功能？（${scopeLabel(global)}）`,
     Object.keys(FEATURES).map((f) => importOption(f, target, global)),
   );
@@ -73,8 +98,9 @@ export function* flow() {
 
   yield title('來源內容');
   let found = 0;
-  for (const f of features) {
-    for (const s of describeSource(sourceRoot, target, f, global)) {
+  const sources = features.map((f) => [f, describeSource(sourceRoot, target, f, global)]);
+  for (const [f, list] of sources) {
+    for (const s of list) {
       const detail = !s.exists ? '（不存在）' : s.names ? s.names.join('、') : '存在';
       yield log(`${FEATURES[f].label}：${displayPath(s.path)} ${detail}`, s.exists ? 'info' : 'muted');
       if (s.exists) found += 1;
@@ -86,7 +112,18 @@ export function* flow() {
   }
   yield blank();
 
-  const stage = createStage(sourceRoot, scope);
+  const { dropped, exclude } = yield* pickSourceItems(sources);
+  features = features.filter((f) => !dropped.includes(f));
+  if (features.length === 0) {
+    yield log('至少要選一個功能', 'error');
+    return false;
+  }
+  if (exclude.length) {
+    yield log(`沒勾的 ${exclude.length} 個項目不會放進暫存區，也不會匯入`, 'muted');
+    yield blank();
+  }
+
+  const stage = createStage(sourceRoot, scope, { exclude });
   try {
     yield title('匯入到暫存區');
     const cmd = stageCommand(stage, { target, features, scope });

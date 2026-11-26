@@ -14,11 +14,25 @@ const SOURCE_LINKS = {
   global: ['.claude', '.codex', '.agents', '.claude.json'],
 };
 
-export function createStage(sourceRoot, scope) {
+// exclude：不要放進暫存區的絕對路徑（逐項挑選時沒勾的 skill／subagent／command）。
+// 沒有排除的目錄整個用 symlink；底下有要排除的，就建一個真的目錄，逐項連結其他的
+function linkFiltered(src, dest, exclude) {
+  if (exclude.includes(src)) return;
+  const inside = exclude.some((e) => e.startsWith(src + path.sep));
+  if (!inside || !fs.statSync(src).isDirectory()) {
+    fs.symlinkSync(src, dest);
+    return;
+  }
+  fs.mkdirSync(dest);
+  for (const name of fs.readdirSync(src)) linkFiltered(path.join(src, name), path.join(dest, name), exclude);
+}
+
+export function createStage(sourceRoot, scope, { exclude = [] } = {}) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ai-toolkit-import-'));
+  const excluded = exclude.map((e) => path.resolve(e));
   for (const name of SOURCE_LINKS[scope]) {
     const src = path.join(sourceRoot, name);
-    if (fs.existsSync(src)) fs.symlinkSync(src, path.join(dir, name));
+    if (fs.existsSync(src)) linkFiltered(src, path.join(dir, name), excluded);
   }
   return dir;
 }
