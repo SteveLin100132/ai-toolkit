@@ -42,7 +42,7 @@ npm test
 |---|---|---|
 | 1. 驗證 | 檢查所有 rule、skill、subagent、command 的 frontmatter、名稱、不必要的檔案，root rule 是否只有一個，以及 `hooks.jsonc`、`mcp.json` 能否解析 | 不問 |
 | 2. 新增 | 建立 rule、skill、subagent、command 骨架，或在 `hooks.jsonc` 加一筆 hook、在 `mcp.json` 加一個 MCP 伺服器 | 種類；rule／skill／subagent／command：名稱、描述（rule 另問是否為 root）；hook：事件、matcher、指令；MCP：名稱、連線方式、指令或網址；確認 |
-| 3. 匯入 | 把 Claude Code 或 Codex 既有的 rules、skills、subagents、commands、hooks、MCP 轉成 rulesync 格式，先暫存再合併 | 來源工具、功能、專案或全域、來源目錄、確認 |
+| 3. 匯入 | 把 Claude Code 或 Codex 既有的 rules、skills、subagents、commands、hooks、MCP 轉成 rulesync 格式，先暫存再合併 | 來源工具、功能、專案或全域、來源目錄、要匯入哪些 skill／subagent／command、確認 |
 
 **產生輸出**
 
@@ -82,6 +82,7 @@ npm test
 - MCP 伺服器與 hooks 用**合併**的方式：新的加進去、同名但設定不同的 MCP 伺服器會被覆蓋、完全相同的 hook 會略過，既有的保留。
 - 匯入的主規則（Claude Code 匯入成 `rules/CLAUDE.md`，Codex CLI 匯入成 `rules/overview.md`）跟既有的主規則不同名時，會讓您選：匯入成一般規則、取代既有主規則，或不匯入主規則。
 - Codex CLI 的 `AGENTS.md` 已經合併了所有一般規則，匯入後如果本 repo 還有一般規則，再產生時內容會重複，要手動整理。
+- Skills、Subagents、Commands 有兩個以上的項目時，會讓您勾選要匯入哪些（預設全勾）。沒勾的項目不會放進暫存區，所以就算它的 frontmatter 有問題（例如第一行不是 `---`），也不會讓 rulesync 整批匯入失敗。Rules、Hooks、MCP 會合成或合併成單一檔案，維持整批匯入。
 - 「從 Git 取得」目前只開放 skills、subagents、commands。
 
 「從遠端取得」「從 Git 取得」注意事項：
